@@ -1,10 +1,45 @@
-<img src="./assets/images/lattice_logo.png" alt="Lattice logo" width="60">
-
 # Lattice
 
-Lattice is a personal research project exploring the design of a modern command-and-control (C2) framework. The work is early, the aim is a system that can eventually stand as a product, and every element of the design remains subject to change.
+Lattice is a personal research project exploring the design of a modern command-and-control (C2) framework.
 
-Despite the early stage, Lattice is intended to be extensible. The name reflects that choice of structure. It does not claim greater extensibility than existing plug-and-play frameworks such as [Mythic](https://github.com/its-a-feature/mythic). It is a design decision, not a comparison.
+It targets a shippable, multiplayer platform: a teamserver, an operator client, a reference agent, versioned wire contracts, and a single extension system for additional agents, channels, modules, and event hooks.
 
-# Acknowledgements
+## Architecture
+
+### Protocol
+
+Versioned schemas for agent traffic, operator control, and extension manifests. Compatibility across releases and plugins depends on this layer.
+
+### Server
+
+The control plane. It authenticates operators, manages listeners through channel plugins, schedules tasks, generates payloads, stores loot, and emits events for hooks.
+
+### Client
+
+The operator console. It speaks only to the server API. Client-side extensions can register extra commands without forking the console.
+
+### Agent
+
+The reference implant shipped with the core. It checks in over configured channels, runs tasked commands, and serves as the template other agent extensions should match.
+
+### Extensions
+
+Installable packages in four kinds:
+
+- **Agents** alternate implants and builders
+- **Channels** paired listeners, agent transports, and profile schemas
+- **Modules** optional post-exploitation capabilities
+- **Hooks** webhooks, log shippers, and other event consumers
+
+Each extension declares a manifest, entrypoints, and the protocol versions it supports. The teamserver loads and versions them through one install path.
+
+### Profiles
+
+Channel and malleable settings as data files. Generation and listeners consume profile IDs rather than hard-coded endpoints.
+
+## Status
+
+Early design. Interfaces and layout may change before a stable release.
+
 # License
+MIT License. See [LICENSE](LICENSE) for the full text.
