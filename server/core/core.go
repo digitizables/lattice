@@ -264,6 +264,22 @@ func (c *Core) IsTaskCancelled(ctx context.Context, agentID, taskID string) (boo
 	return c.store.IsTaskCancelled(ctx, taskID, agentID)
 }
 
+// SetTaskLiveOutput stores partial stdout/stderr for a running task.
+// Returns cancelled so the agent can stop promptly after a Ctrl+C.
+func (c *Core) SetTaskLiveOutput(ctx context.Context, agentID, taskID, stdout, stderr string) (cancelled bool, err error) {
+	cancelled, err = c.store.IsTaskCancelled(ctx, taskID, agentID)
+	if err != nil {
+		return false, err
+	}
+	if cancelled {
+		return true, nil
+	}
+	if err := c.store.SetTaskLiveOutput(ctx, taskID, agentID, stdout, stderr); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
 // CancelTask aborts a queued/sent/running task (operator Ctrl+C).
 func (c *Core) CancelTask(ctx context.Context, taskID string) (bool, error) {
 	if taskID == "" {

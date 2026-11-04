@@ -205,6 +205,8 @@ export async function cancelTask(taskId: string): Promise<boolean> {
 /**
  * Submit a task, then poll GetTask until the agent finishes.
  * Pass AbortSignal (Ctrl+C) to cancel remotely and stop waiting.
+ * onOutput receives the full stdout snapshot as the agent streams live output
+ * (ping, tail, …) while status is still running.
  */
 export async function submitTaskAndWait(
   agentId: string,
@@ -213,6 +215,7 @@ export async function submitTaskAndWait(
   onStatus?: (status: string) => void,
   onTaskId?: (taskId: string) => void,
   signal?: AbortSignal,
+  onOutput?: (stdout: string, stderr: string) => void,
 ): Promise<TaskUpdated> {
   const taskId = await submitTask(agentId, name, args);
   onTaskId?.(taskId);
@@ -238,11 +241,23 @@ export async function submitTaskAndWait(
   );
 
   const started = Date.now();
+  const maxWaitMs = 2 * 60 * 60 * 1000; // match agent shell backstop
   let lastStatus = "queued";
   let queuedHintAt = 0;
-  while (Date.now() - started < 120_000) {
+  let lastStdout = "";
+  let lastStderr = "";
+  let runningSince = 0;
+
+  while (Date.now() - started < maxWaitMs) {
     if (signal?.aborted) {
       await abortRemote();
+      // Best-effort final snapshot so streamed lines are not lost.
+      try {
+        const t = await getTask(taskId);
+        if (t.stdout || t.stderr) onOutput?.(t.stdout || "", t.stderr || "");
+      } catch {
+        // ignore
+      }
       throw new Error("^C");
     }
     try {
@@ -253,11 +268,23 @@ export async function submitTaskAndWait(
     }
     const task = await getTask(taskId);
     if (signal?.aborted || task.status === "cancelled") {
+      if (task.stdout || task.stderr) onOutput?.(task.stdout || "", task.stderr || "");
       throw new Error("^C");
     }
     if (task.status && task.status !== lastStatus) {
       lastStatus = task.status;
       onStatus?.(task.status);
+      if (task.status === "running" || task.status === "sent") {
+        runningSince = Date.now();
+      }
+    }
+    if (
+      (task.status === "running" || task.status === "sent" || task.status === "completed" || task.status === "failed") &&
+      (task.stdout !== lastStdout || task.stderr !== lastStderr)
+    ) {
+      lastStdout = task.stdout || "";
+      lastStderr = task.stderr || "";
+      onOutput?.(lastStdout, lastStderr);
     }
     if (task.status === "queued" || task.status === "") {
       const waited = Date.now() - started;
@@ -277,6 +304,8 @@ export async function submitTaskAndWait(
     if (task.status === "completed" || task.status === "failed") {
       return task;
     }
+    // Safety: if "running" forever with no cancel, still respect maxWaitMs via loop.
+    void runningSince;
   }
   throw new Error("timed out waiting for agent");
 }

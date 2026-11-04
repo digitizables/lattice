@@ -79,6 +79,19 @@ func (h *HTTP) PollCancel(ctx context.Context, agentID, taskID string) (bool, er
 	return out.GetCancelled(), err
 }
 
+// PostOutput pushes live stdout/stderr for a still-running task.
+// cancelled means the operator hit Ctrl+C and the agent should stop.
+func (h *HTTP) PostOutput(ctx context.Context, agentID, taskID, stdout, stderr string) (cancelled bool, err error) {
+	var out agentv1.AgentTaskOutputResponse
+	err = h.post(ctx, "/v1/task_output", &agentv1.AgentTaskOutput{
+		AgentId: agentID,
+		TaskId:  taskID,
+		Stdout:  stdout,
+		Stderr:  stderr,
+	}, &out)
+	return out.GetCancelled(), err
+}
+
 func (h *HTTP) post(ctx context.Context, path string, in, out proto.Message) error {
 	raw, err := proto.Marshal(in)
 	if err != nil {

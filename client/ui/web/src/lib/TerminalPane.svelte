@@ -98,7 +98,6 @@
   export function interrupt() {
     if (!busy || !activeAbort) return;
     activeAbort.abort();
-    void appendTerm('<span class="term-muted">^C — cancelled</span>');
   }
 
   $effect(() => {
@@ -138,6 +137,28 @@
     );
     const ac = new AbortController();
     activeAbort = ac;
+    let shownOut = 0;
+    let shownErr = 0;
+    const paintLive = async (stdout: string, stderr: string) => {
+      const out = stdout.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      const err = stderr.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      if (out.length > shownOut) {
+        const chunk = out.slice(shownOut);
+        shownOut = out.length;
+        if (chunk.trimEnd() !== "" || chunk.includes("\n")) {
+          await appendTerm(formatTermOutput(chunk.replace(/\n$/, "")));
+        }
+      }
+      if (err.length > shownErr) {
+        const chunk = err.slice(shownErr);
+        shownErr = err.length;
+        if (chunk.trimEnd() !== "" || chunk.includes("\n")) {
+          await appendTerm(
+            `<span class="term-err">${formatTermOutput(chunk.replace(/\n$/, ""))}</span>`,
+          );
+        }
+      }
+    };
     try {
       const result = await submitTaskAndWait(
         agentId,
@@ -146,15 +167,11 @@
         undefined,
         undefined,
         ac.signal,
+        (stdout, stderr) => {
+          void paintLive(stdout, stderr);
+        },
       );
-      if (result.stdout) {
-        await appendTerm(formatTermOutput(result.stdout.replace(/\n$/, "")));
-      }
-      if (result.stderr) {
-        await appendTerm(
-          `<span class="term-err">${formatTermOutput(result.stderr.replace(/\n$/, ""))}</span>`,
-        );
-      }
+      await paintLive(result.stdout || "", result.stderr || "");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg === "^C") {

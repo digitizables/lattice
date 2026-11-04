@@ -73,6 +73,8 @@ Use **+** for another terminal tab, the split icons (or right-click a pane → S
 
 Command input is highlighted with **highlight.js** (bash / PowerShell / DOS). Agent output is rendered with **ansi_up**, so `ls` directory colors and other ANSI SGR sequences show in the console. Unix agents run the shell under a PTY with color-friendly `ls`/`grep` helpers.
 
+Long-running commands (`ping`, `tail -f`, …) stream live output into the console. **Ctrl+C** cancels the task on the teamserver; the agent stops the process tree (and sends Ctrl+C on a PTY) and returns whatever output was captured.
+
 Persistence method codenames (**Keel**, **Harbor**, **Splice**) and full wipe (**Ash**) are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
 
 ### Lab vs target persistence

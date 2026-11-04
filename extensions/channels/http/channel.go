@@ -52,6 +52,7 @@ func (c *Channel) Start(ctx context.Context, addr string) error {
 	mux.HandleFunc("POST /v1/result", c.handleResult)
 	mux.HandleFunc("POST /v1/task_running", c.handleTaskRunning)
 	mux.HandleFunc("POST /v1/task_cancel_poll", c.handleTaskCancelPoll)
+	mux.HandleFunc("POST /v1/task_output", c.handleTaskOutput)
 	mux.HandleFunc("POST /v1/update/check", c.handleUpdateCheck)
 	mux.HandleFunc("POST /v1/update/download", c.handleUpdateDownload)
 	mux.HandleFunc("POST /v1/module/download", c.handleModuleDownload)
@@ -311,6 +312,32 @@ func (c *Channel) handleTaskCancelPoll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	raw, err := proto.Marshal(&agentv1.AgentTaskCancelPollResponse{Cancelled: cancelled})
+	if err != nil {
+		http.Error(w, "marshal", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(raw)
+}
+
+func (c *Channel) handleTaskOutput(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 8<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var in agentv1.AgentTaskOutput
+	if err := proto.Unmarshal(body, &in); err != nil {
+		http.Error(w, "bad protobuf", http.StatusBadRequest)
+		return
+	}
+	cancelled, err := c.core.SetTaskLiveOutput(r.Context(), in.GetAgentId(), in.GetTaskId(), in.GetStdout(), in.GetStderr())
+	if err != nil {
+		// Still answer so the agent can keep running if the task just finished.
+		c.log.Debug("task output ignored", "err", err)
+		cancelled, _ = c.core.IsTaskCancelled(r.Context(), in.GetAgentId(), in.GetTaskId())
+	}
+	raw, err := proto.Marshal(&agentv1.AgentTaskOutputResponse{Accepted: true, Cancelled: cancelled})
 	if err != nil {
 		http.Error(w, "marshal", http.StatusInternalServerError)
 		return

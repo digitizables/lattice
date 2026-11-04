@@ -76,6 +76,20 @@ message AgentTaskCancelPollResponse {
   bool cancelled = 1;
 }
 
+// Agent -> server: live stdout/stderr while a task is still running (ping, tail, …).
+message AgentTaskOutput {
+  string agent_id = 1;
+  string task_id = 2;
+  string stdout = 3;
+  string stderr = 4;
+}
+
+message AgentTaskOutputResponse {
+  bool accepted = 1;
+  // True if the operator cancelled — agent should stop the process.
+  bool cancelled = 2;
+}
+
 message UpdateInfo {
   string version = 1;
   string os = 2;

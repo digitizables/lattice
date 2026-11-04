@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/digitizables/lattice/agent/install"
@@ -13,9 +14,28 @@ import (
 )
 
 const (
-	shellTimeout   = 60 * time.Second
+	// Long-running interactive commands (ping, tail -f) rely on operator Ctrl+C
+	// rather than a short timeout. Two hours is a safety backstop only.
+	shellTimeout   = 2 * time.Hour
 	maxOutputBytes = 256 * 1024
 )
+
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 func commandLine(name string, args []string) string {
 	parts := make([]string, 0, 1+len(args))
@@ -125,11 +145,30 @@ func (a *Agent) runShell(ctx context.Context, taskID, kind, line string) (exitCo
 		return 1, "", err.Error()
 	}
 
-	cmd := exec.CommandContext(runCtx, path, argv...)
+	// Do not use CommandContext here: creack/pty and our process-group kill own
+	// lifecycle. CommandContext + pty.Start can race into "exec: already started".
+	cmd := exec.Command(path, argv...)
 	a.ensureCwd()
 	cmd.Dir = a.Cwd
 	applyShellColorEnv(cmd)
-	hideWindow(cmd)
+
+	var outBuf, errBuf lockedBuffer
+	pushLive := func() {
+		if a.Transport == nil || taskID == "" {
+			return
+		}
+		outSnap := truncateOutput(outBuf.String())
+		errSnap := truncateOutput(errBuf.String())
+		pushCtx, pushCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		cancelled, err := a.Transport.PostOutput(pushCtx, a.ID, taskID, outSnap, errSnap)
+		pushCancel()
+		if err != nil {
+			return
+		}
+		if cancelled {
+			cancel()
+		}
+	}
 
 	stopPoll := make(chan struct{})
 	if a.Transport != nil && taskID != "" {
@@ -158,9 +197,9 @@ func (a *Agent) runShell(ctx context.Context, taskID, kind, line string) (exitCo
 		}()
 	}
 
-	var outBuf, errBuf bytes.Buffer
-	runErr := runShellProcess(cmd, &outBuf, &errBuf)
+	runErr := runShellProcess(runCtx, cmd, &outBuf, &errBuf, pushLive)
 	close(stopPoll)
+	pushLive()
 
 	stdout = truncateOutput(outBuf.String())
 	stderr = truncateOutput(errBuf.String())

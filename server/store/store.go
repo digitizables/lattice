@@ -431,6 +431,23 @@ func (s *Store) IsTaskCancelled(ctx context.Context, taskID, agentID string) (bo
 	return status == "cancelled", nil
 }
 
+// SetTaskLiveOutput updates stdout/stderr for a still-running task so operators
+// can watch streaming commands (ping, tail, …) before completion.
+func (s *Store) SetTaskLiveOutput(ctx context.Context, taskID, agentID, stdout, stderr string) error {
+	tag, err := s.pool.Exec(ctx, `
+UPDATE tasks
+SET stdout = $3, stderr = $4, updated_at = NOW()
+WHERE id = $1 AND agent_id = $2 AND status = 'running'`,
+		taskID, agentID, stdout, stderr)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("task %s not running for agent %s", taskID, agentID)
+	}
+	return nil
+}
+
 // CompleteTask stores a result from the agent.
 func (s *Store) CompleteTask(ctx context.Context, taskID, agentID string, exitCode int32, stdout, stderr string) error {
 	return s.FinishTask(ctx, taskID, agentID, "completed", exitCode, stdout, stderr)
