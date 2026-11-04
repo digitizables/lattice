@@ -1118,6 +1118,10 @@ table.sessions tr.selected {
   min-height: 0;
 }
 
+.docs-surface .heading {
+  align-items: center;
+}
+
 .docs-split {
   flex: 1;
   min-height: 0;
@@ -1157,8 +1161,8 @@ table.sessions tr.selected {
 .docs-toc {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-2);
+  gap: 0;
+  padding: 0;
   overflow: auto;
   flex: 1;
   min-height: 0;
@@ -1169,10 +1173,10 @@ table.sessions tr.selected {
   gap: var(--space-1);
   text-align: left;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: transparent;
   color: var(--text);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--page-pad-x);
   transition: background 140ms ease, color 140ms ease;
 }
 
