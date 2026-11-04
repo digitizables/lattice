@@ -13,6 +13,12 @@
     type Session,
   } from "./lib/api";
   import DocsView from "./lib/DocsView.svelte";
+  import {
+    dialectForSession,
+    escapeHtml,
+    formatTermOutput,
+    highlightShell,
+  } from "./lib/shellHighlight";
 
   type NavId = "sessions" | "console" | "listeners" | "docs" | "settings";
 
@@ -55,14 +61,6 @@
           null,
   );
 
-  function escapeHtml(s: string) {
-    return s
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  }
-
   function promptPrefix(agent?: Session | null) {
     if (!agent) return `<span class="term-prompt">lattice&gt;</span>`;
     const user = accountName(agent.username, agent.hostname);
@@ -78,15 +76,22 @@
     return "/";
   }
 
-  function bootConsoleBanner(agent?: Session | null) {
-    const cwd = agent?.cwd || guessDefaultCwd(agent?.os);
-    const shown = formatPromptPath(cwd, pathDisplay) || cwd;
-    termLines = [
-      `<span class="term-muted">cwd ${escapeHtml(shown)}</span>`,
-      '<span class="term-muted">Type a command. Try: help · pwd · cd · dir</span>',
-    ];
+  function clearScrollback() {
+    termLines = [];
     consoleBooted = true;
   }
+
+  function bootConsoleBanner(_agent?: Session | null) {
+    clearScrollback();
+  }
+
+  function highlightLine(line: string, agent?: Session | null): string {
+    return highlightShell(line, dialectForSession(agent?.os, line));
+  }
+
+  const highlightedInput = $derived(
+    highlightShell(termInput, dialectForSession(selected?.os, termInput)),
+  );
 
   async function appendTerm(html: string) {
     termLines = [...termLines, html];
@@ -114,8 +119,8 @@
     if (session) selectSession(session);
     else if (agentId) selectedAgent = agentId;
     nav = "console";
-    if (!consoleBooted || termLines.length === 0) {
-      bootConsoleBanner(session ?? selected);
+    if (!consoleBooted) {
+      clearScrollback();
     }
     focusTerminal();
     void loadPicker("");
@@ -208,50 +213,46 @@
     }
   }
 
-  async function runRemote(cmd: string, args: string[]) {
+  async function runShellLine(line: string) {
     if (!selectedAgent) {
-      await appendTerm(
-        '<span class="term-err">no session selected — open Sessions or type use &lt;agent_id&gt;</span>',
-      );
+      await appendTerm('<span class="term-err">no session selected — pick one in the console toolbar</span>');
       return;
     }
     if (taskBusy) {
-      await appendTerm('<span class="term-err">already waiting on a task — press Ctrl+C to abort</span>');
+      await appendTerm('<span class="term-err">^C to cancel the running command</span>');
       return;
     }
-    const line = [cmd, ...args].join(" ");
 
     taskBusy = true;
     error = "";
     const agent = selected;
     if (agent && !isOnline(agent)) {
       await appendTerm(
-        '<span class="term-err">selected session looks offline (no recent check-in). Pick a live session or start the agent.</span>',
+        '<span class="term-err">session offline (no recent check-in)</span>',
       );
     }
-    await appendTerm(`${promptPrefix(agent)} <span class="term-muted">${escapeHtml(line)}</span>`);
+    await appendTerm(`${promptPrefix(agent)} ${highlightLine(line, agent)}`);
     const ac = new AbortController();
     activeAbort = ac;
     activeTaskId = "";
     try {
       const result = await submitTaskAndWait(
         selectedAgent,
-        cmd,
-        args,
-        (status) => {
-          void appendTerm(`<span class="term-muted">status=${escapeHtml(status)}</span>`);
-        },
+        "shell",
+        [line],
+        undefined,
         (taskId) => {
           activeTaskId = taskId;
-          void appendTerm(`<span class="term-path">task ${escapeHtml(taskId)}</span>`);
         },
         ac.signal,
       );
       if (result.stdout) {
-        await appendTerm(escapeHtml(result.stdout.replace(/\n$/, "")));
+        await appendTerm(formatTermOutput(result.stdout.replace(/\n$/, "")));
       }
       if (result.stderr) {
-        await appendTerm(`<span class="term-err">${escapeHtml(result.stderr.replace(/\n$/, ""))}</span>`);
+        await appendTerm(
+          `<span class="term-err">${formatTermOutput(result.stderr.replace(/\n$/, ""))}</span>`,
+        );
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -275,61 +276,8 @@
     history = [trimmed, ...history.filter((h) => h !== trimmed)].slice(0, 50);
     historyIdx = -1;
 
-    const parts = trimmed.split(/\s+/);
-    const head = parts[0].toLowerCase();
-    const rest = parts.slice(1);
-
-    if (head === "clear" || head === "cls") {
-      bootConsoleBanner(selected);
-      return;
-    }
-    if (head === "help") {
-      await appendTerm(`${promptPrefix(selected)} <span class="term-muted">help</span>`);
-      await appendTerm('<span class="term-muted">Agent builtins: whoami, echo, hostname, pwd, cd</span>');
-      await appendTerm('<span class="term-muted">Shells: shell|cmd|powershell &lt;line&gt; · or type a native command (dir, ls, …)</span>');
-      await appendTerm('<span class="term-muted">Persistence: persist (Keel/Harbor/Splice) · cleanup/Ash · update · elevate &lt;module&gt;</span>');
-      await appendTerm('<span class="term-muted">Working directory starts at C:\\ or / and persists with cd.</span>');
-      await appendTerm('<span class="term-muted">Ctrl+C cancels a queued or running task. Oversized output is truncated at 256KiB.</span>');
-      await appendTerm('<span class="term-muted">Local: help, clear, sessions [query], use &lt;agent_id&gt;</span>');
-      return;
-    }
-    if (head === "sessions") {
-      const q = rest.join(" ");
-      await appendTerm(`${promptPrefix(selected)} <span class="term-muted">${escapeHtml(trimmed)}</span>`);
-      const res = await listSessions({ pageSize: 20, query: q || undefined });
-      if (res.sessions.length === 0) {
-        await appendTerm('<span class="term-muted">no sessions</span>');
-        return;
-      }
-      await appendTerm(`<span class="term-muted">${res.totalCount} total · showing ${res.sessions.length}</span>`);
-      for (const s of res.sessions) {
-        const mark = s.agentId === selectedAgent ? "*" : " ";
-        await appendTerm(
-          `<span class="term-muted">${mark}</span> <span class="term-path">${escapeHtml(s.agentId)}</span>  ${escapeHtml(userAtHost(s.username, s.hostname))}  ${escapeHtml(s.os)}/${escapeHtml(s.arch)}`,
-        );
-      }
-      return;
-    }
-    if (head === "use") {
-      await appendTerm(`${promptPrefix(selected)} <span class="term-muted">${escapeHtml(trimmed)}</span>`);
-      const id = rest[0] ?? "";
-      const res = await listSessions({ pageSize: 20, query: id });
-      const match =
-        res.sessions.find((s) => s.agentId === id) ||
-        res.sessions.find((s) => s.agentId.startsWith(id)) ||
-        res.sessions.find((s) => s.hostname.toLowerCase() === id.toLowerCase());
-      if (!match) {
-        await appendTerm('<span class="term-err">unknown session — run sessions</span>');
-        return;
-      }
-      selectSession(match);
-      await appendTerm(`<span class="term-muted">using ${escapeHtml(match.agentId)}</span>`);
-      await appendTerm(`<span class="term-muted">cwd ${escapeHtml(formatPromptPath(match.cwd || guessDefaultCwd(match.os), pathDisplay) || match.cwd || "")}</span>`);
-      return;
-    }
-
-    await runRemote(parts[0], rest);
-    // Pull updated cwd after commands that may change it.
+    // Pure terminal emulator: every line goes to the agent's native OS shell.
+    await runShellLine(trimmed);
     if (selectedAgent) {
       const res = await listSessions({ pageSize: 5, query: selectedAgent });
       const updated = res.sessions.find((s) => s.agentId === selectedAgent);
@@ -408,13 +356,12 @@
   });
 
   $effect(() => {
-    if (nav === "console") {
-      if (!consoleBooted || termLines.length === 0) {
-        bootConsoleBanner(selected);
-      }
-      focusTerminal();
-      void loadPicker(pickerQuery.trim());
+    if (nav !== "console") return;
+    if (!consoleBooted) {
+      clearScrollback();
     }
+    focusTerminal();
+    void loadPicker(pickerQuery.trim());
   });
 </script>
 
@@ -622,7 +569,9 @@
                   {/each}
                 </select>
               </div>
-              <button class="ghost-btn" onclick={() => bootConsoleBanner(selected)}>Clear</button>
+              <button class="ghost-btn" onclick={() => clearScrollback()} title="Clear scrollback (Ctrl+L)"
+                >Clear</button
+              >
             </div>
             <div class="terminal-surface fill">
               <div
@@ -641,17 +590,28 @@
               </div>
               <div class="term-input-row mono">
                 <span class="prompt">{@html promptPrefix(selected)}</span>
-                <input
-                  class="term-input"
-                  bind:this={inputEl}
-                  bind:value={termInput}
-                  readonly={taskBusy}
-                  spellcheck="false"
-                  autocomplete="off"
-                  autocapitalize="off"
-                  placeholder={taskBusy ? "waiting — Ctrl+C to cancel" : "type a command"}
-                  onkeydown={onTermKeydown}
-                />
+                <div class="term-input-wrap">
+                  <div class="term-input-mirror" aria-hidden="true">
+                    {#if termInput}
+                      {@html highlightedInput}
+                    {:else if !taskBusy}
+                      <span class="term-placeholder">command</span>
+                    {:else}
+                      <span class="term-placeholder">waiting — Ctrl+C to cancel</span>
+                    {/if}
+                  </div>
+                  <input
+                    class="term-input"
+                    bind:this={inputEl}
+                    bind:value={termInput}
+                    readonly={taskBusy}
+                    spellcheck="false"
+                    autocomplete="off"
+                    autocapitalize="off"
+                    aria-label="Shell command"
+                    onkeydown={onTermKeydown}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -773,7 +733,7 @@
           ><span class="live">●</span>
           {activeCount.toLocaleString()} active session{activeCount === 1 ? "" : "s"}</span
         >
-        <span>↑↓ history · Ctrl+L clear</span>
+        <span>↑↓ history · Ctrl+L clear scrollback · Ctrl+C cancel</span>
       </footer>
     </section>
   </div>

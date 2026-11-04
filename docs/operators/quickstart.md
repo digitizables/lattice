@@ -49,7 +49,7 @@ go run ./client/cmd/client task <agent_id> powershell "Get-Process | Select -Fir
 go run ./client/cmd/client task <agent_id> ls -la
 ```
 
-On Windows, bare commands and `shell`/`cmd` use `cmd.exe`; `powershell`/`pwsh` use PowerShell. On Unix, bare commands and `shell` use `$SHELL` (fallback `/bin/sh`); `bash` is available when installed.
+On Windows, the console sends each line to `cmd.exe` by default. Prefix with `powershell` / `pwsh` to run PowerShell (Windows agents only). On Unix, lines run under `$SHELL` (fallback `/bin/sh`); `bash` / `sh` prefixes select those shells. PowerShell prefixes are rejected on non-Windows agents.
 
 `client task` prints the task id, then waits until the agent finishes (status lines, then stdout/stderr).
 
@@ -67,7 +67,7 @@ Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:80
 
 The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a listeners status view. The **Documentation** sidebar item (book icon, above Settings) renders these operator guides and the developer getting-started doc in-app; switch sets with Operators / Developers.
 
-Open a session in **Console**, then type commands and press Enter. The shell starts at `C:\` (Windows) or `/` (Unix). Examples: `pwd`, `cd Windows`, `dir`, `powershell Get-Date`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears, **Ctrl+C** cancels a queued or running task.
+Open a session in **Console**, then type native OS commands and press Enter. The console is a terminal emulator (no artificial helpers): every line goes to the agent’s native shell. Working directory starts at `C:\` (Windows) or `/` (Unix); `cd` / `pwd` persist across commands. Examples: `dir`, `ls -la`, `cd Windows`, `powershell Get-Date` (Windows only). ↑/↓ history, Ctrl+L clears scrollback, **Ctrl+C** cancels a queued or running command. The input line has shell syntax highlighting.
 
 Persistence method codenames (**Keel**, **Harbor**, **Splice**) and full wipe (**Ash**) are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
 
