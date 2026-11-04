@@ -7,9 +7,10 @@ func Usage() {
 	fmt.Print(`lattice client
 
 Usage:
-  client sessions
+  client sessions [query]
   client task <agent_id> <name> [args...]
 
+sessions pages through all matches (100 per page).
 task submits work, then waits on StreamEvents until the agent completes it.
 
 Env:

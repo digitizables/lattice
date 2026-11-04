@@ -230,6 +230,41 @@ button {
   border-bottom: 1px solid var(--border-soft);
 }
 
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search {
+  height: 32px;
+  min-width: 220px;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 10px;
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .heading h2 {
   margin: 0;
   font-size: 18px;
@@ -347,10 +382,11 @@ table.sessions tr.selected {
   gap: 10px;
   color: var(--text-muted);
   font-size: 12px;
+  flex-wrap: wrap;
 }
 
 .agent-picker select {
-  min-width: 220px;
+  min-width: 240px;
   height: 32px;
   background: var(--bg-input);
   color: var(--text);

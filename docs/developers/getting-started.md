@@ -10,7 +10,8 @@ Get one full path working before anything else: from the operator through the se
 - **Config** (`server/config`): Done
 - **HTTP channel + listen manager**: Done (TLS by default; lab certs under `data/certs`)
 - **Agent runtime / transport**: Done (`whoami`, `echo`, `hostname`)
-- **Connect API + CLI**: Done (`sessions`, `task` waits on `StreamEvents`)
+- **Connect API + CLI**: Done (`sessions` paginated/searchable, `task` waits on `StreamEvents`)
+- **Scale**: Cursor pagination, server-side search, agent indexes, check-in events only on new sessions
 - **Extension loader**: Done (manifest discover + builtin channel factories; remote install still pending)
 - **Web UI**: Done (Vite + Svelte sessions/task console under `client/ui/web`)
 - **Compose teamserver/web images**: Scaffold only

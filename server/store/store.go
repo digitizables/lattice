@@ -2,10 +2,14 @@ package store
 
 import (
 	"context"
+	"encoding/base64"
 	"embed"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -83,7 +87,17 @@ func (s *Store) Close() {
 }
 
 // UpsertAgent inserts or refreshes an agent on check-in.
-func (s *Store) UpsertAgent(ctx context.Context, a Agent) error {
+// created is true when this was the first insert for the id.
+func (s *Store) UpsertAgent(ctx context.Context, a Agent) (created bool, err error) {
+	_, getErr := s.GetAgent(ctx, a.ID)
+	switch {
+	case getErr == nil:
+		created = false
+	case errors.Is(getErr, pgx.ErrNoRows):
+		created = true
+	default:
+		return false, getErr
+	}
 	const q = `
 INSERT INTO agents (id, hostname, username, os, arch, sleep_seconds, last_seen)
 VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -94,10 +108,10 @@ ON CONFLICT (id) DO UPDATE SET
   arch = EXCLUDED.arch,
   sleep_seconds = EXCLUDED.sleep_seconds,
   last_seen = NOW()`
-	_, err := s.pool.Exec(ctx, q,
+	_, err = s.pool.Exec(ctx, q,
 		a.ID, a.Hostname, a.Username, a.OS, a.Arch, int64(a.SleepSeconds),
 	)
-	return err
+	return created, err
 }
 
 // DeleteAgent removes an agent and cascaded tasks.
@@ -112,15 +126,68 @@ func (s *Store) DeleteAgent(ctx context.Context, id string) error {
 	return nil
 }
 
-// ListAgents returns all agents, newest check-in first.
-func (s *Store) ListAgents(ctx context.Context) ([]Agent, error) {
-	const q = `
+// AgentPage is one page of agents plus pagination metadata.
+type AgentPage struct {
+	Agents        []Agent
+	NextPageToken string
+	TotalCount    int32
+}
+
+// ListAgentsPage returns a cursor page of agents ordered by last_seen DESC, id DESC.
+func (s *Store) ListAgentsPage(ctx context.Context, pageSize int32, pageToken, query string) (AgentPage, error) {
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+
+	filterArgs := []any{}
+	filterWhere := []string{"TRUE"}
+	argn := 1
+
+	q := strings.TrimSpace(query)
+	if q != "" {
+		pattern := "%" + escapeLike(q) + "%"
+		filterWhere = append(filterWhere, fmt.Sprintf(
+			"(id ILIKE $%d ESCAPE '\\' OR hostname ILIKE $%d ESCAPE '\\' OR username ILIKE $%d ESCAPE '\\' OR os ILIKE $%d ESCAPE '\\' OR arch ILIKE $%d ESCAPE '\\')",
+			argn, argn, argn, argn, argn,
+		))
+		filterArgs = append(filterArgs, pattern)
+		argn++
+	}
+
+	countQ := `SELECT COUNT(*) FROM agents WHERE ` + strings.Join(filterWhere, " AND ")
+	var total int32
+	if err := s.pool.QueryRow(ctx, countQ, filterArgs...).Scan(&total); err != nil {
+		return AgentPage{}, err
+	}
+
+	listWhere := append([]string{}, filterWhere...)
+	listArgs := append([]any{}, filterArgs...)
+	listArgn := argn
+	if pageToken != "" {
+		ts, id, err := decodeAgentCursor(pageToken)
+		if err != nil {
+			return AgentPage{}, fmt.Errorf("invalid page_token: %w", err)
+		}
+		listWhere = append(listWhere, fmt.Sprintf("(last_seen, id) < ($%d::timestamptz, $%d)", listArgn, listArgn+1))
+		listArgs = append(listArgs, ts, id)
+		listArgn += 2
+	}
+
+	limitPlaceholder := fmt.Sprintf("$%d", listArgn)
+	listArgs = append(listArgs, pageSize)
+	listQ := `
 SELECT id, hostname, username, os, arch, sleep_seconds, last_seen, created_at
 FROM agents
-ORDER BY last_seen DESC`
-	rows, err := s.pool.Query(ctx, q)
+WHERE ` + strings.Join(listWhere, " AND ") + `
+ORDER BY last_seen DESC, id DESC
+LIMIT ` + limitPlaceholder
+
+	rows, err := s.pool.Query(ctx, listQ, listArgs...)
 	if err != nil {
-		return nil, err
+		return AgentPage{}, err
 	}
 	defer rows.Close()
 
@@ -132,12 +199,49 @@ ORDER BY last_seen DESC`
 			&a.ID, &a.Hostname, &a.Username, &a.OS, &a.Arch,
 			&sleep, &a.LastSeen, &a.CreatedAt,
 		); err != nil {
-			return nil, err
+			return AgentPage{}, err
 		}
 		a.SleepSeconds = uint64(sleep)
 		out = append(out, a)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return AgentPage{}, err
+	}
+
+	page := AgentPage{Agents: out, TotalCount: total}
+	if int32(len(out)) == pageSize && len(out) > 0 {
+		last := out[len(out)-1]
+		page.NextPageToken = encodeAgentCursor(last.LastSeen, last.ID)
+	}
+	return page, nil
+}
+
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
+func encodeAgentCursor(ts time.Time, id string) string {
+	raw := ts.UTC().Format(time.RFC3339Nano) + "\x00" + id
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+func decodeAgentCursor(token string) (time.Time, string, error) {
+	b, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return time.Time{}, "", err
+	}
+	parts := strings.SplitN(string(b), "\x00", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		return time.Time{}, "", fmt.Errorf("malformed cursor")
+	}
+	ts, err := time.Parse(time.RFC3339Nano, parts[0])
+	if err != nil {
+		return time.Time{}, "", err
+	}
+	return ts, parts[1], nil
 }
 
 // GetAgent returns one agent by id.

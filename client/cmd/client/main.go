@@ -30,21 +30,41 @@ func main() {
 
 	switch os.Args[1] {
 	case "sessions":
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		res, err := rpc.ListSessions(ctx, &operatorv1.ListSessionsRequest{})
-		if err != nil {
-			fail(err)
+		query := ""
+		if len(os.Args) > 2 {
+			query = strings.Join(os.Args[2:], " ")
 		}
-		if len(res.GetSessions()) == 0 {
-			fmt.Println("no sessions")
-			return
-		}
-		for _, s := range res.GetSessions() {
-			fmt.Printf("%s  %s  %s/%s  last_seen=%s\n",
-				s.GetAgentId(), userAtHost(s.GetUsername(), s.GetHostname()), s.GetOs(), s.GetArch(),
-				s.GetLastSeen().AsTime().UTC().Format(time.RFC3339),
-			)
+		var token string
+		var shown int
+		for {
+			res, err := rpc.ListSessions(ctx, &operatorv1.ListSessionsRequest{
+				PageSize:  100,
+				PageToken: token,
+				Query:     query,
+			})
+			if err != nil {
+				fail(err)
+			}
+			if shown == 0 {
+				fmt.Printf("total=%d\n", res.GetTotalCount())
+			}
+			if len(res.GetSessions()) == 0 && shown == 0 {
+				fmt.Println("no sessions")
+				return
+			}
+			for _, s := range res.GetSessions() {
+				fmt.Printf("%s  %s  %s/%s  last_seen=%s\n",
+					s.GetAgentId(), userAtHost(s.GetUsername(), s.GetHostname()), s.GetOs(), s.GetArch(),
+					s.GetLastSeen().AsTime().UTC().Format(time.RFC3339),
+				)
+				shown++
+			}
+			token = res.GetNextPageToken()
+			if token == "" {
+				return
+			}
 		}
 	case "task":
 		if len(os.Args) < 4 {

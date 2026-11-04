@@ -33,7 +33,7 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 		agentID = uuid.NewString()
 	}
 
-	err := c.store.UpsertAgent(ctx, store.Agent{
+	created, err := c.store.UpsertAgent(ctx, store.Agent{
 		ID:           agentID,
 		Hostname:     in.GetHostname(),
 		Username:     in.GetUsername(),
@@ -45,11 +45,14 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 		return nil, fmt.Errorf("upsert agent: %w", err)
 	}
 
-	agent, err := c.store.GetAgent(ctx, agentID)
-	if err != nil {
-		return nil, fmt.Errorf("load agent: %w", err)
+	// Only broadcast brand-new sessions. Routine beacons must not fan out to every operator.
+	if created {
+		agent, err := c.store.GetAgent(ctx, agentID)
+		if err != nil {
+			return nil, fmt.Errorf("load agent: %w", err)
+		}
+		c.bus.publish(Event{Session: &agent})
 	}
-	c.bus.publish(Event{Session: &agent})
 
 	tasks, err := c.store.DequeueTasks(ctx, agentID, 16)
 	if err != nil {
@@ -95,9 +98,9 @@ func (c *Core) HandleTaskResult(ctx context.Context, in *agentv1.AgentTaskResult
 	return &agentv1.AgentTaskResultResponse{Accepted: true}, nil
 }
 
-// ListSessions returns agents as operator-facing session rows.
-func (c *Core) ListSessions(ctx context.Context) ([]store.Agent, error) {
-	return c.store.ListAgents(ctx)
+// ListSessions returns a page of agents.
+func (c *Core) ListSessions(ctx context.Context, pageSize int32, pageToken, query string) (store.AgentPage, error) {
+	return c.store.ListAgentsPage(ctx, pageSize, pageToken, query)
 }
 
 // DeleteSession removes a session/agent row.

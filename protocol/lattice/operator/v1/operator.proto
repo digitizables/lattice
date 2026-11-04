@@ -13,10 +13,20 @@ service OperatorService {
   rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
 }
 
-message ListSessionsRequest {}
+message ListSessionsRequest {
+  // Max rows to return. Server clamps to [1, 200]; default 50.
+  int32 page_size = 1;
+  // Opaque cursor from a previous ListSessionsResponse.next_page_token.
+  string page_token = 2;
+  // Case-insensitive match against id, hostname, username, os, or arch.
+  string query = 3;
+}
 
 message ListSessionsResponse {
   repeated Session sessions = 1;
+  string next_page_token = 2;
+  // Total matching rows for the current query (not just this page).
+  int32 total_count = 3;
 }
 
 message DeleteSessionRequest {
@@ -45,7 +55,7 @@ message SubmitTaskResponse {
 }
 
 message StreamEventsRequest {
-  // Empty = all agents.
+  // Empty = all agents (task events only; routine check-ins are not broadcast).
   string agent_id = 1;
 }
 

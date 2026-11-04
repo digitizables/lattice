@@ -34,14 +34,17 @@ func (s *Server) Register(srv *connect.Server) {
 
 func (s *Server) ListSessions(
 	ctx context.Context,
-	_ *operatorv1.ListSessionsRequest,
+	req *operatorv1.ListSessionsRequest,
 ) (*operatorv1.ListSessionsResponse, error) {
-	agents, err := s.core.ListSessions(ctx)
+	page, err := s.core.ListSessions(ctx, req.GetPageSize(), req.GetPageToken(), req.GetQuery())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err.Error())
 	}
-	resp := &operatorv1.ListSessionsResponse{}
-	for _, a := range agents {
+	resp := &operatorv1.ListSessionsResponse{
+		NextPageToken: page.NextPageToken,
+		TotalCount:    page.TotalCount,
+	}
+	for _, a := range page.Agents {
 		resp.Sessions = append(resp.Sessions, agentToSession(a))
 	}
 	return resp, nil

@@ -35,6 +35,18 @@ export type TaskUpdated = {
   exitCode: number;
 };
 
+export type ListSessionsParams = {
+  pageSize?: number;
+  pageToken?: string;
+  query?: string;
+};
+
+export type ListSessionsResult = {
+  sessions: Session[];
+  nextPageToken: string;
+  totalCount: number;
+};
+
 const servicePrefix = "/lattice.operator.v1.OperatorService";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -72,7 +84,7 @@ function formatConnectError(body: string, fallback: string): string {
 function encodeConnectJSONFrame(message: object): Uint8Array {
   const payload = textEncoder.encode(JSON.stringify(message));
   const out = new Uint8Array(5 + payload.length);
-  out[0] = 0; // flags: data frame
+  out[0] = 0;
   const len = payload.length;
   out[1] = (len >>> 24) & 0xff;
   out[2] = (len >>> 16) & 0xff;
@@ -138,12 +150,22 @@ function mapSession(raw: Record<string, unknown>): Session {
   };
 }
 
-export async function listSessions(): Promise<Session[]> {
-  const data = await connectUnary<Record<string, never>, { sessions?: Record<string, unknown>[] }>(
+export async function listSessions(params: ListSessionsParams = {}): Promise<ListSessionsResult> {
+  const body: Record<string, unknown> = {
+    pageSize: params.pageSize ?? 50,
+  };
+  if (params.pageToken) body.pageToken = params.pageToken;
+  if (params.query) body.query = params.query;
+
+  const data = await connectUnary<Record<string, unknown>, Record<string, unknown>>(
     "ListSessions",
-    {},
+    body,
   );
-  return (data.sessions ?? []).map(mapSession);
+  return {
+    sessions: ((data.sessions as Record<string, unknown>[] | undefined) ?? []).map(mapSession),
+    nextPageToken: String(data.nextPageToken ?? ""),
+    totalCount: Number(data.totalCount ?? 0),
+  };
 }
 
 export async function submitTask(

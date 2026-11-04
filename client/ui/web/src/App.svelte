@@ -11,11 +11,20 @@
 
   type NavId = "sessions" | "console" | "listeners";
 
+  const pageSize = 50;
+
   let sessions = $state<Session[]>([]);
+  let totalCount = $state(0);
+  let nextPageToken = $state("");
+  let pageTokens = $state<string[]>([""]); // tokens to fetch each page; index 0 is first page
+  let pageIndex = $state(0);
+  let query = $state("");
+  let queryInput = $state("");
   let error = $state("");
   let loading = $state(false);
   let nav = $state<NavId>("sessions");
   let selectedAgent = $state("");
+  let selectedSession = $state<Session | null>(null);
   let termLines = $state<string[]>([
     '<span class="term-muted">Lattice operator console ready.</span>',
     '<span class="term-muted">Select a session, then type a command. Try: help</span>',
@@ -26,8 +35,17 @@
   let historyIdx = $state(-1);
   let termEl: HTMLDivElement | undefined = $state();
   let inputEl: HTMLInputElement | undefined = $state();
+  let pickerQuery = $state("");
+  let pickerSessions = $state<Session[]>([]);
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const selected = $derived(sessions.find((s) => s.agentId === selectedAgent));
+  const selected = $derived(
+    selectedSession && selectedSession.agentId === selectedAgent
+      ? selectedSession
+      : sessions.find((s) => s.agentId === selectedAgent) ??
+          pickerSessions.find((s) => s.agentId === selectedAgent) ??
+          null,
+  );
 
   function escapeHtml(s: string) {
     return s
@@ -37,7 +55,7 @@
       .replaceAll('"', "&quot;");
   }
 
-  function promptPrefix(agent?: Session) {
+  function promptPrefix(agent?: Session | null) {
     if (!agent) return `<span class="term-prompt">lattice&gt;</span>`;
     const user = accountName(agent.username, agent.hostname);
     return `<span class="term-identity">${escapeHtml(user)}</span>@<span class="term-path">${escapeHtml(agent.hostname)}</span> <span class="term-prompt">$</span>`;
@@ -53,24 +71,91 @@
     void tick().then(() => inputEl?.focus());
   }
 
-  function openConsole(agentId?: string) {
-    if (agentId) selectedAgent = agentId;
-    nav = "console";
-    focusTerminal();
+  function selectSession(s: Session) {
+    selectedAgent = s.agentId;
+    selectedSession = s;
   }
 
-  async function refresh() {
+  function openConsole(agentId?: string, session?: Session) {
+    if (session) selectSession(session);
+    else if (agentId) selectedAgent = agentId;
+    nav = "console";
+    focusTerminal();
+    void loadPicker("");
+  }
+
+  async function loadPage(index: number) {
     loading = true;
     error = "";
     try {
-      sessions = await listSessions();
+      const token = pageTokens[index] ?? "";
+      const res = await listSessions({
+        pageSize,
+        pageToken: token || undefined,
+        query: query || undefined,
+      });
+      sessions = res.sessions;
+      totalCount = res.totalCount;
+      nextPageToken = res.nextPageToken;
+      pageIndex = index;
+      if (res.nextPageToken) {
+        pageTokens = [...pageTokens.slice(0, index + 1), res.nextPageToken];
+      } else {
+        pageTokens = pageTokens.slice(0, index + 1);
+      }
       if (!selectedAgent && sessions.length > 0) {
-        selectedAgent = sessions[0].agentId;
+        selectSession(sessions[0]);
+      } else if (selectedAgent) {
+        const onPage = sessions.find((s) => s.agentId === selectedAgent);
+        if (onPage) selectedSession = onPage;
       }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       loading = false;
+    }
+  }
+
+  function applySearch() {
+    query = queryInput.trim();
+    pageTokens = [""];
+    pageIndex = 0;
+    void loadPage(0);
+  }
+
+  function scheduleSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => applySearch(), 250);
+  }
+
+  async function loadPicker(q: string) {
+    try {
+      const res = await listSessions({ pageSize: 30, query: q || undefined });
+      pickerSessions = res.sessions;
+      if (selectedSession && !pickerSessions.some((s) => s.agentId === selectedSession?.agentId)) {
+        pickerSessions = [selectedSession, ...pickerSessions];
+      }
+    } catch {
+      // keep prior picker list
+    }
+  }
+
+  function schedulePickerSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => void loadPicker(pickerQuery.trim()), 250);
+  }
+
+  async function removeSession(agentId: string) {
+    error = "";
+    try {
+      await deleteSession(agentId);
+      if (selectedAgent === agentId) {
+        selectedAgent = "";
+        selectedSession = null;
+      }
+      await loadPage(pageIndex);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -104,24 +189,12 @@
       if (result.stderr) {
         await appendTerm(`<span class="term-err">${escapeHtml(result.stderr.replace(/\n$/, ""))}</span>`);
       }
-      await refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await appendTerm(`<span class="term-err">${escapeHtml(msg)}</span>`);
     } finally {
       loading = false;
       focusTerminal();
-    }
-  }
-
-  async function removeSession(agentId: string) {
-    error = "";
-    try {
-      await deleteSession(agentId);
-      if (selectedAgent === agentId) selectedAgent = "";
-      await refresh();
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -143,17 +216,19 @@
     if (head === "help") {
       await appendTerm(`${promptPrefix(selected)} <span class="term-muted">help</span>`);
       await appendTerm('<span class="term-muted">Agent: whoami, echo, hostname</span>');
-      await appendTerm('<span class="term-muted">Local: help, clear, sessions, use &lt;agent_id&gt;</span>');
+      await appendTerm('<span class="term-muted">Local: help, clear, sessions [query], use &lt;agent_id&gt;</span>');
       return;
     }
     if (head === "sessions") {
-      await appendTerm(`${promptPrefix(selected)} <span class="term-muted">sessions</span>`);
-      await refresh();
-      if (sessions.length === 0) {
+      const q = rest.join(" ");
+      await appendTerm(`${promptPrefix(selected)} <span class="term-muted">${escapeHtml(trimmed)}</span>`);
+      const res = await listSessions({ pageSize: 20, query: q || undefined });
+      if (res.sessions.length === 0) {
         await appendTerm('<span class="term-muted">no sessions</span>');
         return;
       }
-      for (const s of sessions) {
+      await appendTerm(`<span class="term-muted">${res.totalCount} total · showing ${res.sessions.length}</span>`);
+      for (const s of res.sessions) {
         const mark = s.agentId === selectedAgent ? "*" : " ";
         await appendTerm(
           `<span class="term-muted">${mark}</span> <span class="term-path">${escapeHtml(s.agentId)}</span>  ${escapeHtml(userAtHost(s.username, s.hostname))}  ${escapeHtml(s.os)}/${escapeHtml(s.arch)}`,
@@ -164,15 +239,16 @@
     if (head === "use") {
       await appendTerm(`${promptPrefix(selected)} <span class="term-muted">${escapeHtml(trimmed)}</span>`);
       const id = rest[0] ?? "";
+      const res = await listSessions({ pageSize: 20, query: id });
       const match =
-        sessions.find((s) => s.agentId === id) ||
-        sessions.find((s) => s.agentId.startsWith(id)) ||
-        sessions.find((s) => s.hostname.toLowerCase() === id.toLowerCase());
+        res.sessions.find((s) => s.agentId === id) ||
+        res.sessions.find((s) => s.agentId.startsWith(id)) ||
+        res.sessions.find((s) => s.hostname.toLowerCase() === id.toLowerCase());
       if (!match) {
         await appendTerm('<span class="term-err">unknown session — run sessions</span>');
         return;
       }
-      selectedAgent = match.agentId;
+      selectSession(match);
       await appendTerm(`<span class="term-muted">using ${escapeHtml(match.agentId)}</span>`);
       return;
     }
@@ -213,15 +289,23 @@
   }
 
   $effect(() => {
-    void refresh();
+    void loadPage(0);
+  });
+
+  $effect(() => {
+    if (nav !== "sessions") return;
+    const idx = pageIndex;
     const id = setInterval(() => {
-      void refresh();
-    }, 5000);
+      void loadPage(idx);
+    }, 15000);
     return () => clearInterval(id);
   });
 
   $effect(() => {
-    if (nav === "console") focusTerminal();
+    if (nav === "console") {
+      focusTerminal();
+      void loadPicker(pickerQuery.trim());
+    }
   });
 </script>
 
@@ -274,15 +358,28 @@
             <div class="heading">
               <div>
                 <h2>Sessions</h2>
-                <p>Active agent callbacks. Open one to task it in the console.</p>
+                <p>{totalCount.toLocaleString()} agent{totalCount === 1 ? "" : "s"} · page {pageIndex + 1}</p>
               </div>
-              <button class="ghost-btn" onclick={() => refresh()} disabled={loading}>Refresh</button>
+              <div class="heading-actions">
+                <input
+                  class="search"
+                  placeholder="Search id, host, user, os…"
+                  bind:value={queryInput}
+                  oninput={() => scheduleSearch()}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter") applySearch();
+                  }}
+                />
+                <button class="ghost-btn" onclick={() => loadPage(pageIndex)} disabled={loading}>Refresh</button>
+              </div>
             </div>
             <div class="pane-body grow">
               {#if sessions.length === 0}
                 <div class="empty">
-                  <strong>No sessions yet</strong>
-                  <span>Start an agent against <span class="mono">https://127.0.0.1:8443</span>.</span>
+                  <strong>{query ? "No matches" : "No sessions yet"}</strong>
+                  <span
+                    >{#if query}Try a different query.{:else}Start an agent against <span class="mono">https://127.0.0.1:8443</span>.{/if}</span
+                  >
                 </div>
               {:else}
                 <table class="sessions">
@@ -299,8 +396,8 @@
                     {#each sessions as s}
                       <tr
                         class:selected={selectedAgent === s.agentId}
-                        onclick={() => (selectedAgent = s.agentId)}
-                        ondblclick={() => openConsole(s.agentId)}
+                        onclick={() => selectSession(s)}
+                        ondblclick={() => openConsole(s.agentId, s)}
                       >
                         <td class="mono" title={s.agentId}>{s.agentId.slice(0, 8)}…</td>
                         <td>{userAtHost(s.username, s.hostname)}</td>
@@ -311,7 +408,7 @@
                             class="ghost-btn"
                             onclick={(e) => {
                               e.stopPropagation();
-                              openConsole(s.agentId);
+                              openConsole(s.agentId, s);
                             }}>Console</button
                           >
                           <button
@@ -328,19 +425,46 @@
                 </table>
               {/if}
             </div>
+            <div class="pager">
+              <button class="ghost-btn" disabled={pageIndex === 0 || loading} onclick={() => loadPage(pageIndex - 1)}
+                >Previous</button
+              >
+              <span class="muted"
+                >{sessions.length ? pageIndex * pageSize + 1 : 0}–{pageIndex * pageSize + sessions.length} of {totalCount.toLocaleString()}</span
+              >
+              <button
+                class="ghost-btn"
+                disabled={!nextPageToken || loading}
+                onclick={() => loadPage(pageIndex + 1)}>Next</button
+              >
+            </div>
           </div>
         {:else if nav === "console"}
           <div class="surface console-surface">
             <div class="console-toolbar">
-              <label class="agent-picker" for="agent-select">
-                <span>Session</span>
-                <select id="agent-select" bind:value={selectedAgent} onchange={() => focusTerminal()}>
+              <div class="agent-picker">
+                <label for="picker-search">Session</label>
+                <input
+                  id="picker-search"
+                  class="search"
+                  placeholder="Filter sessions…"
+                  bind:value={pickerQuery}
+                  oninput={() => schedulePickerSearch()}
+                />
+                <select
+                  bind:value={selectedAgent}
+                  onchange={() => {
+                    const s = pickerSessions.find((x) => x.agentId === selectedAgent);
+                    if (s) selectedSession = s;
+                    focusTerminal();
+                  }}
+                >
                   <option value="">Select session…</option>
-                  {#each sessions as s}
-                    <option value={s.agentId}>{userAtHost(s.username, s.hostname)}</option>
+                  {#each pickerSessions as s}
+                    <option value={s.agentId}>{userAtHost(s.username, s.hostname)} · {s.agentId.slice(0, 8)}</option>
                   {/each}
                 </select>
-              </label>
+              </div>
               <button class="ghost-btn" onclick={() => (termLines = [])}>Clear</button>
             </div>
             <div class="terminal-surface fill">
@@ -407,7 +531,7 @@
       </div>
 
       <footer class="footer-bar">
-        <span><span class="live">●</span> {sessions.length} session{sessions.length === 1 ? "" : "s"}</span>
+        <span><span class="live">●</span> {totalCount.toLocaleString()} session{totalCount === 1 ? "" : "s"}</span>
         <span>↑↓ history · Ctrl+L clear</span>
       </footer>
     </section>
