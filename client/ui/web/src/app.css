@@ -610,8 +610,8 @@ table.sessions tr.selected {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--page-pad-x);
+  gap: 0;
+  padding: var(--space-2) var(--page-pad-x) var(--space-2) 0;
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg);
   flex-shrink: 0;
@@ -621,7 +621,7 @@ table.sessions tr.selected {
 .term-tabs {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 0;
   min-width: 0;
   overflow-x: auto;
   flex: 1;
@@ -635,8 +635,9 @@ table.sessions tr.selected {
   max-width: 200px;
   min-width: 108px;
   height: var(--tab-h);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  border-left-width: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
@@ -645,16 +646,18 @@ table.sessions tr.selected {
   transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
 
+.term-tab:first-child {
+  border-left-width: 1px;
+}
+
 .term-tab:hover {
   color: var(--text);
   background: var(--bg-panel);
-  border-color: var(--border-soft);
 }
 
 .term-tab.active {
   color: var(--text);
   background: var(--bg-console);
-  border-color: var(--border-soft);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
@@ -704,8 +707,9 @@ table.sessions tr.selected {
   flex-shrink: 0;
   width: var(--tab-h);
   height: var(--tab-h);
+  margin-left: var(--space-2);
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: transparent;
   color: var(--text-muted);
   display: inline-grid;
