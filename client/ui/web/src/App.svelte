@@ -254,7 +254,7 @@
                 <button class="ghost-btn" onclick={() => loadPage(pageIndex)} disabled={listLoading}>Refresh</button>
               </div>
             </div>
-            <div class="pane-body grow">
+            <div class="pane-body grow flush">
               {#if sessions.length === 0}
                 <div class="empty">
                   <strong>{query ? "No matches" : "No sessions yet"}</strong>
@@ -330,7 +330,7 @@
                 <p>Channels started by the teamserver extension loader.</p>
               </div>
             </div>
-            <div class="pane-body">
+            <div class="pane-body flush">
               <table class="sessions">
                 <thead>
                   <tr>
