@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { listSessions, submitTaskAndWait, type Session } from "./lib/api";
+  import { accountName, listSessions, submitTaskAndWait, userAtHost, type Session } from "./lib/api";
 
   type NavId = "sessions" | "console" | "listeners";
 
@@ -32,7 +32,8 @@
 
   function promptPrefix(agent?: Session) {
     if (!agent) return `<span class="term-prompt">lattice&gt;</span>`;
-    return `<span class="term-identity">${escapeHtml(agent.username)}</span>@<span class="term-path">${escapeHtml(agent.hostname)}</span> <span class="term-prompt">$</span>`;
+    const user = accountName(agent.username, agent.hostname);
+    return `<span class="term-identity">${escapeHtml(user)}</span>@<span class="term-path">${escapeHtml(agent.hostname)}</span> <span class="term-prompt">$</span>`;
   }
 
   async function appendTerm(html: string) {
@@ -138,7 +139,7 @@
       for (const s of sessions) {
         const mark = s.agentId === selectedAgent ? "*" : " ";
         await appendTerm(
-          `<span class="term-muted">${mark}</span> <span class="term-path">${escapeHtml(s.agentId)}</span>  ${escapeHtml(s.username)}@${escapeHtml(s.hostname)}  ${escapeHtml(s.os)}/${escapeHtml(s.arch)}`,
+          `<span class="term-muted">${mark}</span> <span class="term-path">${escapeHtml(s.agentId)}</span>  ${escapeHtml(userAtHost(s.username, s.hostname))}  ${escapeHtml(s.os)}/${escapeHtml(s.arch)}`,
         );
       }
       return;
@@ -285,7 +286,7 @@
                         ondblclick={() => openConsole(s.agentId)}
                       >
                         <td class="mono" title={s.agentId}>{s.agentId.slice(0, 8)}…</td>
-                        <td>{s.username}@{s.hostname}</td>
+                        <td>{userAtHost(s.username, s.hostname)}</td>
                         <td>{s.os}/{s.arch}</td>
                         <td class="mono">{s.lastSeen ?? "—"}</td>
                         <td>
@@ -312,7 +313,7 @@
                 <select id="agent-select" bind:value={selectedAgent} onchange={() => focusTerminal()}>
                   <option value="">Select session…</option>
                   {#each sessions as s}
-                    <option value={s.agentId}>{s.username}@{s.hostname}</option>
+                    <option value={s.agentId}>{userAtHost(s.username, s.hostname)}</option>
                   {/each}
                 </select>
               </label>

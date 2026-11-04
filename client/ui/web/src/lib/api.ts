@@ -7,6 +7,25 @@ export type Session = {
   lastSeen?: string;
 };
 
+/** Windows check-ins often send HOST\\user; avoid HOST\\user@HOST in the UI. */
+export function accountName(username: string, hostname: string): string {
+  const sep = username.lastIndexOf("\\");
+  if (sep < 0) return username;
+  const domain = username.slice(0, sep);
+  const account = username.slice(sep + 1);
+  if (hostname && domain.toLowerCase() === hostname.toLowerCase()) {
+    return account || username;
+  }
+  return username;
+}
+
+export function userAtHost(username: string, hostname: string): string {
+  const user = accountName(username, hostname);
+  if (!hostname) return user;
+  if (!user) return hostname;
+  return `${user}@${hostname}`;
+}
+
 export type TaskUpdated = {
   taskId: string;
   agentId: string;

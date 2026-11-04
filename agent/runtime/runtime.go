@@ -48,7 +48,7 @@ func (a *Agent) beat(ctx context.Context) error {
 	hostname, _ := os.Hostname()
 	username := ""
 	if u, err := user.Current(); err == nil {
-		username = u.Username
+		username = accountName(u.Username, hostname)
 	}
 
 	resp, err := a.Transport.CheckIn(ctx, &agentv1.AgentCheckIn{
@@ -100,4 +100,21 @@ func runTask(t *agentv1.Task) (exitCode int32, stdout, stderr string) {
 	default:
 		return 1, "", fmt.Sprintf("unknown command %q", t.GetName())
 	}
+}
+
+// accountName strips HOST\ from Windows usernames when HOST matches the hostname.
+func accountName(username, hostname string) string {
+	i := strings.LastIndex(username, `\`)
+	if i < 0 {
+		return username
+	}
+	domain := username[:i]
+	account := username[i+1:]
+	if hostname != "" && strings.EqualFold(domain, hostname) {
+		if account == "" {
+			return username
+		}
+		return account
+	}
+	return username
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect/v2"
@@ -40,8 +41,8 @@ func main() {
 			return
 		}
 		for _, s := range res.GetSessions() {
-			fmt.Printf("%s  %s@%s  %s/%s  last_seen=%s\n",
-				s.GetAgentId(), s.GetUsername(), s.GetHostname(), s.GetOs(), s.GetArch(),
+			fmt.Printf("%s  %s  %s/%s  last_seen=%s\n",
+				s.GetAgentId(), userAtHost(s.GetUsername(), s.GetHostname()), s.GetOs(), s.GetArch(),
 				s.GetLastSeen().AsTime().UTC().Format(time.RFC3339),
 			)
 		}
@@ -123,4 +124,22 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func userAtHost(username, hostname string) string {
+	user := username
+	if idx := strings.LastIndex(username, `\`); idx >= 0 {
+		domain := username[:idx]
+		account := username[idx+1:]
+		if hostname != "" && strings.EqualFold(domain, hostname) && account != "" {
+			user = account
+		}
+	}
+	if hostname == "" {
+		return user
+	}
+	if user == "" {
+		return hostname
+	}
+	return user + "@" + hostname
 }
