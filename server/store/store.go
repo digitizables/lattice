@@ -134,6 +134,42 @@ func (s *Store) DeleteAgent(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteOtherAgentsByHostname removes agents with the same hostname except keepID.
+// Used so a recreated implant (e.g. Docker lab-agent without a persisted id) does not
+// leave stale duplicate sessions beside the live one.
+func (s *Store) DeleteOtherAgentsByHostname(ctx context.Context, hostname, keepID string) (int64, error) {
+	hostname = strings.TrimSpace(hostname)
+	keepID = strings.TrimSpace(keepID)
+	if hostname == "" || keepID == "" {
+		return 0, nil
+	}
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM agents WHERE lower(hostname) = lower($1) AND id <> $2`,
+		hostname, keepID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// DeduplicateAgentsByHostname keeps the newest last_seen row per hostname and deletes the rest.
+func (s *Store) DeduplicateAgentsByHostname(ctx context.Context) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `
+DELETE FROM agents a
+USING agents b
+WHERE lower(a.hostname) = lower(b.hostname)
+  AND a.hostname <> ''
+  AND (
+    a.last_seen < b.last_seen
+    OR (a.last_seen = b.last_seen AND a.id < b.id)
+  )`)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // DeleteAgentsByHostname removes every agent whose hostname matches (case-insensitive).
 // Used to purge leftover command-center host sessions when local agents are denied.
 func (s *Store) DeleteAgentsByHostname(ctx context.Context, hostname string) (int64, error) {

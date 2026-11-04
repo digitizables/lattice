@@ -73,6 +73,12 @@ func main() {
 			log.Info("purged command-center host sessions", "count", n, "hostname", cfg.Hostname)
 		}
 	}
+	if n, err := c.DeduplicateSessionsByHostname(ctx); err != nil {
+		log.Error("dedupe sessions by hostname", "err", err)
+		os.Exit(1)
+	} else if n > 0 {
+		log.Info("removed duplicate hostname sessions", "count", n)
+	}
 	mgr := listen.NewManager()
 
 	deps := extensions.ChannelDeps{Core: c, Log: log, Cleartext: cfg.AgentCleartext}

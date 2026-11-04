@@ -217,6 +217,22 @@ button {
   flex-direction: column;
 }
 
+.console-host {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.console-host.visible {
+  display: flex;
+}
+
+.console-host > .console-surface {
+  flex: 1;
+  min-height: 0;
+}
+
 .surface {
   flex: 1;
   min-height: 0;

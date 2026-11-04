@@ -28,7 +28,7 @@ Lab TLS certs are created under `data/certs/` on first start.
 docker compose -f packager/docker/docker-compose.lab.yml up -d --build
 ```
 
-The command-center machine is refused as a session by default (`LATTICE_ALLOW_LOCAL_AGENTS=false`). Lab persistence is the Compose `restart: unless-stopped` policy (see [persistence.md](persistence.md) for Keel/Harbor/Splice on real targets).
+The command-center machine is refused as a session by default (`LATTICE_ALLOW_LOCAL_AGENTS=false`). Lab persistence is the Compose `restart: unless-stopped` policy plus a volume for `agent.id` so recreating the container reuses the same session (see [persistence.md](persistence.md) for Keel/Harbor/Splice on real targets). The teamserver also keeps one session per hostname: a live check-in removes stale duplicates with the same hostname.
 
 4. List sessions and task:
 

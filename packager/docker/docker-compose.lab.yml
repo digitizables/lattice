@@ -9,8 +9,24 @@ services:
     hostname: lab-agent
     environment:
       LATTICE_SERVER: https://host.docker.internal:8443
+      # Persist agent id across container recreate so sessions do not multiply.
+      LATTICE_AGENT_ID_FILE: /var/lib/lattice/agent.id
+    volumes:
+      - lab-agent-data:/var/lib/lattice
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # Docker-native always-on: restart the container if it exits (lab stand-in for Harbor/Keel).
     restart: unless-stopped
-    command: ["-server", "https://host.docker.internal:8443", "-insecure", "-sleep", "2s"]
+    command:
+      [
+        "-server",
+        "https://host.docker.internal:8443",
+        "-insecure",
+        "-sleep",
+        "2s",
+        "-id-file",
+        "/var/lib/lattice/agent.id",
+      ]
+
+volumes:
+  lab-agent-data:

@@ -322,8 +322,6 @@
               >
             </div>
           </div>
-        {:else if nav === "console"}
-          <ConsoleView pathDisplay={pathDisplay} bind:openAgentId={consoleOpenAgentId} />
         {:else if nav === "listeners"}
           <div class="surface">
             <div class="heading">
@@ -355,7 +353,7 @@
           </div>
         {:else if nav === "docs"}
           <DocsView />
-        {:else}
+        {:else if nav === "settings"}
           <div class="surface">
             <div class="heading">
               <div>
@@ -435,6 +433,11 @@
             </div>
           </div>
         {/if}
+
+        <!-- Keep mounted so tabs/panes/scrollback survive leaving Console. -->
+        <div class="console-host" class:visible={nav === "console"} aria-hidden={nav !== "console"}>
+          <ConsoleView pathDisplay={pathDisplay} bind:openAgentId={consoleOpenAgentId} />
+        </div>
       </div>
 
       <footer class="footer-bar">

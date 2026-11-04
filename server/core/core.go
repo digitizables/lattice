@@ -63,6 +63,11 @@ func (c *Core) PurgeCommandCenterSessions(ctx context.Context) (int64, error) {
 	return c.store.DeleteAgentsByHostname(ctx, c.serverHostname)
 }
 
+// DeduplicateSessionsByHostname keeps the newest agent per hostname.
+func (c *Core) DeduplicateSessionsByHostname(ctx context.Context) (int64, error) {
+	return c.store.DeduplicateAgentsByHostname(ctx)
+}
+
 // SubscribeEvents returns a live event feed for operators.
 func (c *Core) SubscribeEvents(buffer int) (<-chan Event, func()) {
 	return c.bus.Subscribe(buffer)
@@ -86,6 +91,14 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 	})
 	if err != nil {
 		return nil, fmt.Errorf("upsert agent: %w", err)
+	}
+
+	// One live session per hostname: drop stale duplicates (common after Docker recreates
+	// an agent without a persisted id file).
+	if host := strings.TrimSpace(in.GetHostname()); host != "" {
+		if _, err := c.store.DeleteOtherAgentsByHostname(ctx, host, agentID); err != nil {
+			return nil, fmt.Errorf("dedupe hostname sessions: %w", err)
+		}
 	}
 
 	// Only broadcast brand-new sessions. Routine beacons must not fan out to every operator.
