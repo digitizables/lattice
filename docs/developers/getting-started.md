@@ -1,14 +1,14 @@
 # Getting started
 
-Get one full path working before anything else: operator -> server -> HTTP channel -> agent -> result. By then Compose should be up with Postgres, the teamserver, and nginx for the UI.
+Get one full path working before anything else: from the operator through the server and HTTP channel to the agent, then back with a result. By then Compose should be up with Postgres, the teamserver, and nginx for the UI.
 
 ## Stack
 
 - **Teamserver, CLI, reference agent:** Go 1.23
 - **Web UI:** TypeScript, Vite, Svelte (`client/ui/web`)
 - **Schemas / codegen:** Protobuf + [Buf](https://buf.build)
-- **Operator <-> server:** [Connect](https://connectrpc.com) over HTTP/2 (Protobuf). Same services for CLI and browser. Live updates via Connect server streaming.
-- **Agent <-> server (v1 channel):** HTTPS, Protobuf bodies
+- **Operator and server:** [Connect](https://connectrpc.com) over HTTP/2 (Protobuf). Same services for CLI and browser. Live updates via Connect server streaming.
+- **Agent and server (v1 channel):** HTTPS, Protobuf bodies
 - **DB:** PostgreSQL 16
 - **Config / profiles:** YAML
 - **Logs:** `log/slog`
@@ -33,7 +33,7 @@ Keep server, CLI, and the reference agent in Go so `protocol/` only has to gener
 
 ## Build order
 
-1. **`protocol/`** - check-in, task, result messages; Connect services for sessions, tasking, events. Buf -> Go now; TS when you start the UI.
+1. **`protocol/`** - check-in, task, result messages; Connect services for sessions, tasking, events. Generate Go from Buf now; TypeScript when you start the UI.
 2. **`server/store`** - goose migrations (operators, sessions, tasks, results); talk to the DB with pgx.
 3. **`server/core`** - session registry + task queue on top of the store.
 4. **`extensions/channels/http`** + **`server/listen`** - one HTTPS listener on chi, behind a channel interface.
