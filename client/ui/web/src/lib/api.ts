@@ -200,23 +200,6 @@ export async function cancelTask(taskId: string): Promise<boolean> {
   return Boolean(data.cancelled);
 }
 
-/** Heuristic: commands that often dump huge directory/filesystem listings. */
-export function mayProduceLargeOutput(line: string): boolean {
-  const s = line.trim();
-  if (!s) return false;
-  const lower = s.toLowerCase();
-
-  if (/^(dir|tree)(\s|$)/i.test(s)) return true;
-  if (/^ls(\s|$)/i.test(s) && /(^|\s)-(r|R)\b/.test(s)) return true;
-  if (/^(get-childitem|gci|ls)\b/i.test(s) && /-recurse\b/i.test(s)) return true;
-  if (/^find(\s|$)/i.test(s)) return true;
-  if (/^(grep|rg)\b/i.test(s) && /(^|\s)-r\b/.test(lower)) return true;
-  if (/^shell\s+(dir|tree|find)\b/i.test(s)) return true;
-  if (/^cmd\s+(dir|tree)\b/i.test(s)) return true;
-  if (/^powershell\s+.*(get-childitem|gci).*-recurse/i.test(s)) return true;
-  return false;
-}
-
 /**
  * Submit a task, then poll GetTask until the agent finishes.
  * Pass AbortSignal (Ctrl+C) to cancel remotely and stop waiting.

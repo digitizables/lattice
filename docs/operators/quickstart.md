@@ -71,7 +71,7 @@ Open a session in **Console**, then type commands and press Enter. The shell sta
 
 **Settings** (gear in the sidebar) → **Terminal** controls full vs partial path in the prompt.
 
-Commands that often dump huge listings (`dir`, `tree`, recursive `ls` / `Get-ChildItem`, etc.) ask for confirmation first. Agent output is capped at 256KiB.
+Agent output is capped at 256KiB.
 
 The agent process must be running while you task. If the console stays on a queued status, start:
 

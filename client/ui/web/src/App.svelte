@@ -6,7 +6,6 @@
     formatPromptPath,
     listSessions,
     loadPathDisplay,
-    mayProduceLargeOutput,
     savePathDisplay,
     submitTaskAndWait,
     userAtHost,
@@ -218,16 +217,6 @@
       return;
     }
     const line = [cmd, ...args].join(" ");
-    if (mayProduceLargeOutput(line)) {
-      const ok = window.confirm(
-        `“${line}” often produces a large amount of output.\n\nRun it anyway?`,
-      );
-      if (!ok) {
-        await appendTerm(`${promptPrefix(selected)} <span class="term-muted">${escapeHtml(line)}</span>`);
-        await appendTerm('<span class="term-muted">cancelled — large output not confirmed</span>');
-        return;
-      }
-    }
 
     taskBusy = true;
     error = "";
@@ -296,7 +285,7 @@
       await appendTerm('<span class="term-muted">Agent builtins: whoami, echo, hostname, pwd, cd</span>');
       await appendTerm('<span class="term-muted">Shells: shell|cmd|powershell &lt;line&gt; · or type a native command (dir, ls, …)</span>');
       await appendTerm('<span class="term-muted">Working directory starts at C:\\ or / and persists with cd.</span>');
-      await appendTerm('<span class="term-muted">Ctrl+C aborts a running task. Wide listings (dir/tree/…) ask for confirmation first.</span>');
+      await appendTerm('<span class="term-muted">Ctrl+C aborts a running task. Oversized output is truncated at 256KiB.</span>');
       await appendTerm('<span class="term-muted">Local: help, clear, sessions [query], use &lt;agent_id&gt;</span>');
       return;
     }
