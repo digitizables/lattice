@@ -198,6 +198,10 @@ button {
   background: var(--text);
 }
 
+.sidebar-spacer {
+  flex: 1;
+}
+
 .workspace {
   flex: 1;
   min-width: 0;
@@ -352,6 +356,60 @@ table.sessions tr.selected {
 
 .status-off {
   color: var(--text-muted);
+}
+
+.settings-section {
+  max-width: 560px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--bg);
+}
+
+.settings-section h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+
+.setting-options {
+  display: flex;
+  gap: 8px;
+}
+
+.active-setting {
+  color: var(--text) !important;
+  border-color: var(--text) !important;
+  background: #252525 !important;
+}
+
+.command-preview {
+  margin-top: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  background: #111;
+  padding: 10px;
+}
+
+.command-preview .label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.command-preview code {
+  display: block;
+  color: var(--ok);
+  font-size: 12px;
+  word-break: break-all;
 }
 
 .empty {

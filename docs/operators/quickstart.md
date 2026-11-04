@@ -67,7 +67,9 @@ Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:80
 
 The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a listeners status view.
 
-Open a session in **Console**, then type commands and press Enter. Examples: `whoami`, `dir`, `powershell Get-Date`, `shell ipconfig`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears, **Ctrl+C** aborts a running task.
+Open a session in **Console**, then type commands and press Enter. The shell starts at `C:\` (Windows) or `/` (Unix). Examples: `pwd`, `cd Windows`, `dir`, `powershell Get-Date`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears, **Ctrl+C** aborts a running task.
+
+**Settings** (gear in the sidebar) → **Terminal** controls full vs partial path in the prompt.
 
 Commands that often dump huge listings (`dir`, `tree`, recursive `ls` / `Get-ChildItem`, etc.) ask for confirmation first. Agent output is capped at 256KiB.
 

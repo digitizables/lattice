@@ -44,6 +44,7 @@ message Session {
   string os = 4;
   string arch = 5;
   google.protobuf.Timestamp last_seen = 6;
+  string cwd = 7;
 }
 
 message SubmitTaskRequest {

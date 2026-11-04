@@ -56,6 +56,8 @@ func (a *Agent) runShell(ctx context.Context, taskID, kind, line string) (exitCo
 	}
 
 	cmd := exec.CommandContext(runCtx, path, argv...)
+	a.ensureCwd()
+	cmd.Dir = a.Cwd
 	hideWindow(cmd)
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
@@ -135,6 +137,19 @@ func (a *Agent) runTask(ctx context.Context, t *agentv1.Task) (exitCode int32, s
 		return 0, strings.Join(args, " "), ""
 	case "hostname":
 		return runBuiltinHostname()
+	case "pwd":
+		a.ensureCwd()
+		return 0, a.Cwd, ""
+	case "cd":
+		target := ""
+		if len(args) > 0 {
+			target = strings.Join(args, " ")
+		}
+		next, err := a.changeDirectory(target)
+		if err != nil {
+			return 1, "", err.Error()
+		}
+		return 0, next, ""
 	case "shell", "run":
 		return a.runShell(ctx, taskID, "default", commandLine("", args))
 	case "cmd":

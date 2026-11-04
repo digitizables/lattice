@@ -40,6 +40,7 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 		OS:           in.GetOs(),
 		Arch:         in.GetArch(),
 		SleepSeconds: in.GetSleepSeconds(),
+		Cwd:          in.GetCwd(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("upsert agent: %w", err)
@@ -94,6 +95,9 @@ func (c *Core) HandleTaskResult(ctx context.Context, in *agentv1.AgentTaskResult
 	)
 	if err != nil {
 		return nil, err
+	}
+	if cwd := in.GetCwd(); cwd != "" {
+		_ = c.store.UpdateAgentCwd(ctx, in.GetAgentId(), cwd)
 	}
 	task, err := c.store.GetTask(ctx, in.GetTaskId())
 	if err != nil {

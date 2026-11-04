@@ -31,6 +31,7 @@ type Agent struct {
 	OS           string
 	Arch         string
 	SleepSeconds uint64
+	Cwd          string
 	LastSeen     time.Time
 	CreatedAt    time.Time
 }
@@ -99,19 +100,26 @@ func (s *Store) UpsertAgent(ctx context.Context, a Agent) (created bool, err err
 		return false, getErr
 	}
 	const q = `
-INSERT INTO agents (id, hostname, username, os, arch, sleep_seconds, last_seen)
-VALUES ($1, $2, $3, $4, $5, $6, NOW())
+INSERT INTO agents (id, hostname, username, os, arch, sleep_seconds, cwd, last_seen)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 ON CONFLICT (id) DO UPDATE SET
   hostname = EXCLUDED.hostname,
   username = EXCLUDED.username,
   os = EXCLUDED.os,
   arch = EXCLUDED.arch,
   sleep_seconds = EXCLUDED.sleep_seconds,
+  cwd = EXCLUDED.cwd,
   last_seen = NOW()`
 	_, err = s.pool.Exec(ctx, q,
-		a.ID, a.Hostname, a.Username, a.OS, a.Arch, int64(a.SleepSeconds),
+		a.ID, a.Hostname, a.Username, a.OS, a.Arch, int64(a.SleepSeconds), a.Cwd,
 	)
 	return created, err
+}
+
+// UpdateAgentCwd stores the agent's working directory.
+func (s *Store) UpdateAgentCwd(ctx context.Context, id, cwd string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE agents SET cwd = $2 WHERE id = $1`, id, cwd)
+	return err
 }
 
 // DeleteAgent removes an agent and cascaded tasks.
@@ -179,7 +187,7 @@ func (s *Store) ListAgentsPage(ctx context.Context, pageSize int32, pageToken, q
 	limitPlaceholder := fmt.Sprintf("$%d", listArgn)
 	listArgs = append(listArgs, pageSize)
 	listQ := `
-SELECT id, hostname, username, os, arch, sleep_seconds, last_seen, created_at
+SELECT id, hostname, username, os, arch, sleep_seconds, cwd, last_seen, created_at
 FROM agents
 WHERE ` + strings.Join(listWhere, " AND ") + `
 ORDER BY last_seen DESC, id DESC
@@ -197,7 +205,7 @@ LIMIT ` + limitPlaceholder
 		var sleep int64
 		if err := rows.Scan(
 			&a.ID, &a.Hostname, &a.Username, &a.OS, &a.Arch,
-			&sleep, &a.LastSeen, &a.CreatedAt,
+			&sleep, &a.Cwd, &a.LastSeen, &a.CreatedAt,
 		); err != nil {
 			return AgentPage{}, err
 		}
@@ -247,13 +255,13 @@ func decodeAgentCursor(token string) (time.Time, string, error) {
 // GetAgent returns one agent by id.
 func (s *Store) GetAgent(ctx context.Context, id string) (Agent, error) {
 	const q = `
-SELECT id, hostname, username, os, arch, sleep_seconds, last_seen, created_at
+SELECT id, hostname, username, os, arch, sleep_seconds, cwd, last_seen, created_at
 FROM agents WHERE id = $1`
 	var a Agent
 	var sleep int64
 	err := s.pool.QueryRow(ctx, q, id).Scan(
 		&a.ID, &a.Hostname, &a.Username, &a.OS, &a.Arch,
-		&sleep, &a.LastSeen, &a.CreatedAt,
+		&sleep, &a.Cwd, &a.LastSeen, &a.CreatedAt,
 	)
 	if err != nil {
 		return Agent{}, err

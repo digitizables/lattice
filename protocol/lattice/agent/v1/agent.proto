@@ -16,6 +16,9 @@ message AgentCheckIn {
 
   // Agent's configured sleep; informational for operators.
   uint64 sleep_seconds = 6;
+
+  // Current working directory on the host (shell commands run here).
+  string cwd = 7;
 }
 
 // Server -> agent after check-in.
@@ -38,6 +41,8 @@ message AgentTaskResult {
   int32 exit_code = 3;
   string stdout = 4;
   string stderr = 5;
+  // Current working directory after the task (keeps operator prompt in sync).
+  string cwd = 6;
 }
 
 message AgentTaskResultResponse {

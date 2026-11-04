@@ -173,6 +173,7 @@ func agentToSession(a store.Agent) *operatorv1.Session {
 		Os:       a.OS,
 		Arch:     a.Arch,
 		LastSeen: timestamppb.New(a.LastSeen),
+		Cwd:      a.Cwd,
 	}
 }
 

@@ -1,0 +1,5 @@
+-- +goose Up
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS cwd TEXT NOT NULL DEFAULT '';
+
+-- +goose Down
+ALTER TABLE agents DROP COLUMN IF EXISTS cwd;

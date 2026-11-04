@@ -4,8 +4,39 @@ export type Session = {
   username: string;
   os: string;
   arch: string;
+  cwd?: string;
   lastSeen?: string;
 };
+
+export type PathDisplay = "full" | "partial";
+
+const PATH_DISPLAY_KEY = "lattice.terminal.pathDisplay";
+
+export function loadPathDisplay(): PathDisplay {
+  const v = localStorage.getItem(PATH_DISPLAY_KEY);
+  return v === "partial" ? "partial" : "full";
+}
+
+export function savePathDisplay(mode: PathDisplay) {
+  localStorage.setItem(PATH_DISPLAY_KEY, mode);
+}
+
+/** Format host cwd for the prompt. */
+export function formatPromptPath(cwd: string | undefined, mode: PathDisplay): string {
+  if (!cwd) return "";
+  const normalized = cwd.replace(/\\/g, "/");
+  if (mode === "full") return cwd;
+  // Windows drive root or Unix root
+  if (/^[a-zA-Z]:[\\/]?$/.test(cwd) || cwd === "/") return cwd;
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length === 0) return cwd;
+  const last = parts[parts.length - 1];
+  // Preserve Windows drive letter when present
+  if (/^[a-zA-Z]:/.test(cwd)) {
+    return last;
+  }
+  return last;
+}
 
 /** Windows check-ins often send HOST\\user; avoid HOST\\user@HOST in the UI. */
 export function accountName(username: string, hostname: string): string {
@@ -104,6 +135,7 @@ function mapSession(raw: Record<string, unknown>): Session {
     username: String(raw.username ?? ""),
     os: String(raw.os ?? ""),
     arch: String(raw.arch ?? ""),
+    cwd: String(raw.cwd ?? ""),
     lastSeen: lastSeenOut,
   };
 }

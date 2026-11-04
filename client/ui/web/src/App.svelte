@@ -3,14 +3,18 @@
   import {
     accountName,
     deleteSession,
+    formatPromptPath,
     listSessions,
+    loadPathDisplay,
     mayProduceLargeOutput,
+    savePathDisplay,
     submitTaskAndWait,
     userAtHost,
+    type PathDisplay,
     type Session,
   } from "./lib/api";
 
-  type NavId = "sessions" | "console" | "listeners";
+  type NavId = "sessions" | "console" | "listeners" | "settings";
 
   const pageSize = 50;
 
@@ -27,11 +31,10 @@
   let nav = $state<NavId>("sessions");
   let selectedAgent = $state("");
   let selectedSession = $state<Session | null>(null);
-  let termLines = $state<string[]>([
-    '<span class="term-muted">Lattice operator console ready.</span>',
-    '<span class="term-muted">Select a session, then type a command. Try: help</span>',
-  ]);
+  let termLines = $state<string[]>([]);
+  let consoleBooted = $state(false);
   let sidebarExpanded = $state(false);
+  let pathDisplay = $state<PathDisplay>(loadPathDisplay());
   let termInput = $state("");
   let history = $state<string[]>([]);
   let historyIdx = $state(-1);
@@ -62,7 +65,26 @@
   function promptPrefix(agent?: Session | null) {
     if (!agent) return `<span class="term-prompt">lattice&gt;</span>`;
     const user = accountName(agent.username, agent.hostname);
-    return `<span class="term-identity">${escapeHtml(user)}</span>@<span class="term-path">${escapeHtml(agent.hostname)}</span> <span class="term-prompt">$</span>`;
+    const path = formatPromptPath(agent.cwd || guessDefaultCwd(agent.os), pathDisplay);
+    const pathHtml = path
+      ? `:<span class="term-path">${escapeHtml(path)}</span>`
+      : "";
+    return `<span class="term-identity">${escapeHtml(user)}</span>@<span class="term-path">${escapeHtml(agent.hostname)}</span>${pathHtml} <span class="term-prompt">$</span>`;
+  }
+
+  function guessDefaultCwd(osName?: string): string {
+    if ((osName || "").toLowerCase().includes("windows")) return "C:\\";
+    return "/";
+  }
+
+  function bootConsoleBanner(agent?: Session | null) {
+    const cwd = agent?.cwd || guessDefaultCwd(agent?.os);
+    const shown = formatPromptPath(cwd, pathDisplay) || cwd;
+    termLines = [
+      `<span class="term-muted">cwd ${escapeHtml(shown)}</span>`,
+      '<span class="term-muted">Type a command. Try: help · pwd · cd · dir</span>',
+    ];
+    consoleBooted = true;
   }
 
   async function appendTerm(html: string) {
@@ -91,8 +113,16 @@
     if (session) selectSession(session);
     else if (agentId) selectedAgent = agentId;
     nav = "console";
+    if (!consoleBooted || termLines.length === 0) {
+      bootConsoleBanner(session ?? selected);
+    }
     focusTerminal();
     void loadPicker("");
+  }
+
+  function setPathDisplay(mode: PathDisplay) {
+    pathDisplay = mode;
+    savePathDisplay(mode);
   }
 
   async function loadPage(index: number) {
@@ -258,13 +288,14 @@
     const rest = parts.slice(1);
 
     if (head === "clear" || head === "cls") {
-      termLines = [];
+      bootConsoleBanner(selected);
       return;
     }
     if (head === "help") {
       await appendTerm(`${promptPrefix(selected)} <span class="term-muted">help</span>`);
-      await appendTerm('<span class="term-muted">Agent builtins: whoami, echo, hostname</span>');
+      await appendTerm('<span class="term-muted">Agent builtins: whoami, echo, hostname, pwd, cd</span>');
       await appendTerm('<span class="term-muted">Shells: shell|cmd|powershell &lt;line&gt; · or type a native command (dir, ls, …)</span>');
+      await appendTerm('<span class="term-muted">Working directory starts at C:\\ or / and persists with cd.</span>');
       await appendTerm('<span class="term-muted">Ctrl+C aborts a running task. Wide listings (dir/tree/…) ask for confirmation first.</span>');
       await appendTerm('<span class="term-muted">Local: help, clear, sessions [query], use &lt;agent_id&gt;</span>');
       return;
@@ -300,10 +331,17 @@
       }
       selectSession(match);
       await appendTerm(`<span class="term-muted">using ${escapeHtml(match.agentId)}</span>`);
+      await appendTerm(`<span class="term-muted">cwd ${escapeHtml(formatPromptPath(match.cwd || guessDefaultCwd(match.os), pathDisplay) || match.cwd || "")}</span>`);
       return;
     }
 
     await runRemote(parts[0], rest);
+    // Pull updated cwd after commands that may change it.
+    if (selectedAgent) {
+      const res = await listSessions({ pageSize: 5, query: selectedAgent });
+      const updated = res.sessions.find((s) => s.agentId === selectedAgent);
+      if (updated) selectSession(updated);
+    }
   }
 
   async function onTermKeydown(e: KeyboardEvent) {
@@ -362,6 +400,9 @@
 
   $effect(() => {
     if (nav === "console") {
+      if (!consoleBooted || termLines.length === 0) {
+        bootConsoleBanner(selected);
+      }
       focusTerminal();
       void loadPicker(pickerQuery.trim());
     }
@@ -408,6 +449,14 @@
           <span class="nav-label">Listeners</span>
         </button>
       </nav>
+      <div class="sidebar-spacer"></div>
+      <button class="nav-item" class:active={nav === "settings"} title="Settings" onclick={() => (nav = "settings")}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+        <span class="nav-label">Settings</span>
+      </button>
     </aside>
 
     <section class="workspace">
@@ -516,7 +565,10 @@
                   bind:value={selectedAgent}
                   onchange={() => {
                     const s = pickerSessions.find((x) => x.agentId === selectedAgent);
-                    if (s) selectedSession = s;
+                    if (s) {
+                      selectSession(s);
+                      bootConsoleBanner(s);
+                    }
                     focusTerminal();
                   }}
                 >
@@ -528,7 +580,7 @@
                   {/each}
                 </select>
               </div>
-              <button class="ghost-btn" onclick={() => (termLines = [])}>Clear</button>
+              <button class="ghost-btn" onclick={() => bootConsoleBanner(selected)}>Clear</button>
             </div>
             <div class="terminal-surface fill">
               <div
@@ -561,7 +613,7 @@
               </div>
             </div>
           </div>
-        {:else}
+        {:else if nav === "listeners"}
           <div class="surface">
             <div class="heading">
               <div>
@@ -588,6 +640,47 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        {:else}
+          <div class="surface">
+            <div class="heading">
+              <div>
+                <h2>Settings</h2>
+                <p>Operator console preferences for this browser.</p>
+              </div>
+            </div>
+            <div class="pane-body settings">
+              <section class="settings-section">
+                <h3>Terminal</h3>
+                <p class="muted">Controls how the working directory appears in the prompt.</p>
+                <div class="setting-row">
+                  <span>Path in prompt</span>
+                  <div class="setting-options">
+                    <button
+                      class="ghost-btn"
+                      class:active-setting={pathDisplay === "full"}
+                      onclick={() => setPathDisplay("full")}>Full path</button
+                    >
+                    <button
+                      class="ghost-btn"
+                      class:active-setting={pathDisplay === "partial"}
+                      onclick={() => setPathDisplay("partial")}>Partial path</button
+                    >
+                  </div>
+                </div>
+                <div class="command-preview">
+                  <div class="label">Preview</div>
+                  <code class="mono"
+                    >{accountName(selected?.username || "user", selected?.hostname || "host")}@{selected?.hostname ||
+                      "host"}:{formatPromptPath(
+                      selected?.cwd || guessDefaultCwd(selected?.os),
+                      pathDisplay,
+                    ) || (selected?.os?.includes("windows") ? "C:\\" : "/")}
+                    $</code
+                  >
+                </div>
+              </section>
             </div>
           </div>
         {/if}
