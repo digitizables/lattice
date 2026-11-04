@@ -609,11 +609,15 @@ table.sessions tr.selected {
 .term-tabbar {
   display: flex;
   align-items: stretch;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0;
-  padding: 0 var(--page-pad-x) 0 0;
+  padding: 0;
+  margin: 0;
   height: var(--tab-h);
-  border-bottom: 1px solid var(--border-soft);
+  min-height: var(--tab-h);
+  max-height: var(--tab-h);
+  border: 0;
+  border-bottom: 0;
   background: var(--bg);
   flex-shrink: 0;
 }
@@ -626,6 +630,8 @@ table.sessions tr.selected {
   overflow-x: auto;
   flex: 1;
   height: 100%;
+  margin: 0;
+  padding: 0;
   scrollbar-width: thin;
 }
 
@@ -636,7 +642,8 @@ table.sessions tr.selected {
   max-width: 220px;
   min-width: 120px;
   height: 100%;
-  border: none;
+  margin: 0;
+  border: 0;
   border-right: 1px solid var(--border-soft);
   border-radius: 0;
   background: transparent;
@@ -644,6 +651,8 @@ table.sessions tr.selected {
   font-size: 13px;
   font-weight: 500;
   padding: 0 var(--space-3);
+  box-shadow: none;
+  outline: none;
   transition: background 140ms ease, color 140ms ease;
 }
 
@@ -654,11 +663,14 @@ table.sessions tr.selected {
 .term-tab:hover {
   color: var(--text);
   background: var(--bg-panel);
+  box-shadow: none;
 }
 
-.term-tab.active {
+.term-tab.active,
+.term-tab.active:hover {
   color: var(--text);
   background: #000;
+  box-shadow: none;
 }
 
 .term-tab-main {
@@ -708,8 +720,8 @@ table.sessions tr.selected {
   align-self: stretch;
   width: var(--tab-h);
   height: 100%;
-  margin-left: 0;
-  border: none;
+  margin: 0;
+  border: 0;
   border-left: 1px solid var(--border-soft);
   border-radius: 0;
   background: transparent;
@@ -717,11 +729,13 @@ table.sessions tr.selected {
   display: inline-grid;
   place-items: center;
   padding: 0;
+  box-shadow: none;
 }
 
 .term-tab-add:hover {
   color: var(--text);
   background: var(--bg-panel);
+  box-shadow: none;
 }
 
 .icon-btn {
@@ -739,6 +753,7 @@ table.sessions tr.selected {
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+  border-top: 1px solid var(--border-soft);
 }
 
 .term-split.split-vertical {
