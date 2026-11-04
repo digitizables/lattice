@@ -65,7 +65,7 @@ npm run dev
 
 Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:8080`.
 
-The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a listeners status view.
+The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a listeners status view. The **Documentation** sidebar item (book icon, above Settings) renders these operator guides and the developer getting-started doc in-app; switch sets with Operators / Developers.
 
 Open a session in **Console**, then type commands and press Enter. The shell starts at `C:\` (Windows) or `/` (Unix). Examples: `pwd`, `cd Windows`, `dir`, `powershell Get-Date`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears, **Ctrl+C** cancels a queued or running task.
 

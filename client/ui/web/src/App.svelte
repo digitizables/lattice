@@ -12,8 +12,9 @@
     type PathDisplay,
     type Session,
   } from "./lib/api";
+  import DocsView from "./lib/DocsView.svelte";
 
-  type NavId = "sessions" | "console" | "listeners" | "settings";
+  type NavId = "sessions" | "console" | "listeners" | "docs" | "settings";
 
   const pageSize = 50;
 
@@ -458,6 +459,26 @@
         </button>
       </nav>
       <div class="sidebar-spacer"></div>
+      <button class="nav-item" class:active={nav === "docs"} title="Documentation" onclick={() => (nav = "docs")}>
+        <!-- Lucide "book-open": https://lucide.dev/icons/book-open -->
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 7v14" />
+          <path
+            d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+          />
+        </svg>
+        <span class="nav-label">Docs</span>
+      </button>
       <button class="nav-item" class:active={nav === "settings"} title="Settings" onclick={() => (nav = "settings")}>
         <!-- Lucide "settings" gear: https://lucide.dev/icons/settings -->
         <svg
@@ -663,6 +684,8 @@
               </table>
             </div>
           </div>
+        {:else if nav === "docs"}
+          <DocsView />
         {:else}
           <div class="surface">
             <div class="heading">
