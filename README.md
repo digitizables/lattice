@@ -26,10 +26,10 @@ The reference implant shipped with the core. It checks in over configured channe
 
 Installable packages in four kinds:
 
-- **Agents** alternate implants and builders
-- **Channels** paired listeners, agent transports, and profile schemas
-- **Modules** optional post-exploitation capabilities
-- **Hooks** webhooks, log shippers, and other event consumers
+- **Agents:** Alternate implants and builders
+- **Channels:** Paired listeners, agent transports, and profile schemas
+- **Modules:** Optional post-exploitation capabilities
+- **Hooks:** Webhooks, log shippers, and other event consumers
 
 Each extension declares a manifest, entrypoints, and the protocol versions it supports. The teamserver loads and versions them through one install path.
 
@@ -41,5 +41,6 @@ Channel and malleable settings as data files. Generation and listeners consume p
 
 Early design. Interfaces and layout may change before a stable release.
 
-# License
+## License
+
 MIT License. See [LICENSE](LICENSE) for the full text.
