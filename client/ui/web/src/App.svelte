@@ -284,6 +284,7 @@
       await appendTerm(`${promptPrefix(selected)} <span class="term-muted">help</span>`);
       await appendTerm('<span class="term-muted">Agent builtins: whoami, echo, hostname, pwd, cd</span>');
       await appendTerm('<span class="term-muted">Shells: shell|cmd|powershell &lt;line&gt; · or type a native command (dir, ls, …)</span>');
+      await appendTerm('<span class="term-muted">Persistence: persist (always-on service) · cleanup (remove service + files + exit)</span>');
       await appendTerm('<span class="term-muted">Working directory starts at C:\\ or / and persists with cd.</span>');
       await appendTerm('<span class="term-muted">Ctrl+C cancels a queued or running task. Oversized output is truncated at 256KiB.</span>');
       await appendTerm('<span class="term-muted">Local: help, clear, sessions [query], use &lt;agent_id&gt;</span>');

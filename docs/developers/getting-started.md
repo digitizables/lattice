@@ -9,7 +9,7 @@ Get one full path working before anything else: from the operator through the se
 - **Core** (`server/core`): Done
 - **Config** (`server/config`): Done
 - **HTTP channel + listen manager**: Done (TLS by default; lab certs under `data/certs`)
-- **Agent runtime / transport**: Done (builtins + OS shell: cmd/PowerShell on Windows, $SHELL/bash/sh on Unix)
+- **Agent runtime / transport**: Done (builtins + OS shell; always-on persist + cleanup/burn)
 - **Connect API + CLI**: Done (`sessions` paginated/searchable, `task` waits on `StreamEvents`)
 - **Scale**: Cursor pagination, server-side search, agent indexes, check-in events only on new sessions
 - **Extension loader**: Done (manifest discover + builtin channel factories; remote install still pending)

