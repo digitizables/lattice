@@ -440,9 +440,22 @@
       </nav>
       <div class="sidebar-spacer"></div>
       <button class="nav-item" class:active={nav === "settings"} title="Settings" onclick={() => (nav = "settings")}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- Lucide "settings" gear: https://lucide.dev/icons/settings -->
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path
+            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+          />
           <circle cx="12" cy="12" r="3" />
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
         </svg>
         <span class="nav-label">Settings</span>
       </button>
@@ -636,38 +649,76 @@
             <div class="heading">
               <div>
                 <h2>Settings</h2>
-                <p>Operator console preferences for this browser.</p>
+                <p>Preferences for this browser profile. Changes apply immediately.</p>
               </div>
             </div>
-            <div class="pane-body settings">
-              <section class="settings-section">
-                <h3>Terminal</h3>
-                <p class="muted">Controls how the working directory appears in the prompt.</p>
-                <div class="setting-row">
-                  <span>Path in prompt</span>
-                  <div class="setting-options">
+            <div class="pane-body settings-page">
+              <section class="settings-card">
+                <header class="settings-card-head">
+                  <div>
+                    <h3>Terminal</h3>
+                    <p>Prompt appearance for the operator console.</p>
+                  </div>
+                </header>
+
+                <div class="settings-field">
+                  <div class="settings-field-label">
+                    <span class="settings-field-title">Path in prompt</span>
+                    <span class="settings-field-desc"
+                      >Choose whether the working directory shows in full or as the last segment.</span
+                    >
+                  </div>
+                  <div class="segmented" role="group" aria-label="Path in prompt">
                     <button
-                      class="ghost-btn"
-                      class:active-setting={pathDisplay === "full"}
-                      onclick={() => setPathDisplay("full")}>Full path</button
+                      type="button"
+                      class:active={pathDisplay === "full"}
+                      onclick={() => setPathDisplay("full")}>Full</button
                     >
                     <button
-                      class="ghost-btn"
-                      class:active-setting={pathDisplay === "partial"}
-                      onclick={() => setPathDisplay("partial")}>Partial path</button
+                      type="button"
+                      class:active={pathDisplay === "partial"}
+                      onclick={() => setPathDisplay("partial")}>Partial</button
                     >
                   </div>
                 </div>
-                <div class="command-preview">
-                  <div class="label">Preview</div>
-                  <code class="mono"
-                    >{accountName(selected?.username || "user", selected?.hostname || "host")}@{selected?.hostname ||
-                      "host"}:{formatPromptPath(
-                      selected?.cwd || guessDefaultCwd(selected?.os),
-                      pathDisplay,
-                    ) || (selected?.os?.includes("windows") ? "C:\\" : "/")}
-                    $</code
-                  >
+
+                <div class="settings-preview">
+                  <div class="settings-preview-label">Prompt preview</div>
+                  <div class="settings-preview-box mono">
+                    <span class="term-identity"
+                      >{accountName(selected?.username || "user", selected?.hostname || "host")}</span
+                    >@<span class="term-path">{selected?.hostname || "host"}</span>:<span class="term-path"
+                      >{formatPromptPath(selected?.cwd || guessDefaultCwd(selected?.os), pathDisplay) ||
+                        guessDefaultCwd(selected?.os)}</span
+                    >
+                    <span class="term-prompt"> $</span>
+                  </div>
+                  <div class="settings-preview-meta">
+                    {#if pathDisplay === "full"}
+                      Example: <span class="mono">C:\Users\Paul Beck</span>
+                    {:else}
+                      Example: <span class="mono">Paul Beck</span> (last path segment)
+                    {/if}
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-card">
+                <header class="settings-card-head">
+                  <div>
+                    <h3>Connection</h3>
+                    <p>Where this UI talks to Lattice. Read-only in the lab build.</p>
+                  </div>
+                </header>
+                <div class="settings-kv">
+                  <div>
+                    <span class="settings-k">Operator API</span>
+                    <span class="settings-v mono">http://127.0.0.1:8080</span>
+                  </div>
+                  <div>
+                    <span class="settings-k">Agent channel</span>
+                    <span class="settings-v mono">https://127.0.0.1:8443</span>
+                  </div>
                 </div>
               </section>
             </div>
