@@ -198,9 +198,9 @@ export async function submitTaskAndWait(
           "queued — no agent has picked this up; is an agent running for this session?",
         );
       }
-      if (waited >= 45_000) {
+      if (waited >= 20_000) {
         throw new Error(
-          "task still queued after 45s — start the agent (`go run ./agent/cmd/agent`) or pick a live session",
+          "task still queued after 20s — that session is probably offline. Pick an online session or run: go run ./agent/cmd/agent -server https://127.0.0.1:8443",
         );
       }
     }

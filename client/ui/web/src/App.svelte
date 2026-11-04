@@ -21,7 +21,8 @@
   let query = $state("");
   let queryInput = $state("");
   let error = $state("");
-  let loading = $state(false);
+  let listLoading = $state(false);
+  let taskBusy = $state(false);
   let nav = $state<NavId>("sessions");
   let selectedAgent = $state("");
   let selectedSession = $state<Session | null>(null);
@@ -71,6 +72,13 @@
     void tick().then(() => inputEl?.focus());
   }
 
+  function isOnline(s: Session, now = Date.now()): boolean {
+    if (!s.lastSeen) return false;
+    const t = Date.parse(s.lastSeen);
+    if (Number.isNaN(t)) return false;
+    return now - t < 30_000;
+  }
+
   function selectSession(s: Session) {
     selectedAgent = s.agentId;
     selectedSession = s;
@@ -85,7 +93,7 @@
   }
 
   async function loadPage(index: number) {
-    loading = true;
+    listLoading = true;
     error = "";
     try {
       const token = pageTokens[index] ?? "";
@@ -103,16 +111,22 @@
       } else {
         pageTokens = pageTokens.slice(0, index + 1);
       }
-      if (!selectedAgent && sessions.length > 0) {
-        selectSession(sessions[0]);
-      } else if (selectedAgent) {
+      const fresh = sessions.find((s) => isOnline(s));
+      if (!selectedAgent) {
+        if (fresh) selectSession(fresh);
+        else if (sessions.length > 0) selectSession(sessions[0]);
+      } else {
         const onPage = sessions.find((s) => s.agentId === selectedAgent);
         if (onPage) selectedSession = onPage;
+        // If the selected session went stale and a live one exists, prefer live.
+        if (selectedSession && !isOnline(selectedSession) && fresh) {
+          selectSession(fresh);
+        }
       }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
-      loading = false;
+      listLoading = false;
     }
   }
 
@@ -166,9 +180,18 @@
       );
       return;
     }
-    loading = true;
+    if (taskBusy) {
+      await appendTerm('<span class="term-err">already waiting on a task</span>');
+      return;
+    }
+    taskBusy = true;
     error = "";
     const agent = selected;
+    if (agent && !isOnline(agent)) {
+      await appendTerm(
+        '<span class="term-err">selected session looks offline (no recent check-in). Pick a live session or start the agent.</span>',
+      );
+    }
     const line = [cmd, ...args].join(" ");
     await appendTerm(`${promptPrefix(agent)} <span class="term-muted">${escapeHtml(line)}</span>`);
     try {
@@ -193,7 +216,7 @@
       const msg = e instanceof Error ? e.message : String(e);
       await appendTerm(`<span class="term-err">${escapeHtml(msg)}</span>`);
     } finally {
-      loading = false;
+      taskBusy = false;
       focusTerminal();
     }
   }
@@ -370,7 +393,7 @@
                     if (e.key === "Enter") applySearch();
                   }}
                 />
-                <button class="ghost-btn" onclick={() => loadPage(pageIndex)} disabled={loading}>Refresh</button>
+                <button class="ghost-btn" onclick={() => loadPage(pageIndex)} disabled={listLoading}>Refresh</button>
               </div>
             </div>
             <div class="pane-body grow">
@@ -387,6 +410,7 @@
                     <tr>
                       <th>Agent</th>
                       <th>User@Host</th>
+                      <th>Status</th>
                       <th>Platform</th>
                       <th>Last seen</th>
                       <th></th>
@@ -401,6 +425,7 @@
                       >
                         <td class="mono" title={s.agentId}>{s.agentId.slice(0, 8)}…</td>
                         <td>{userAtHost(s.username, s.hostname)}</td>
+                        <td class={isOnline(s) ? "status-on" : "status-off"}>{isOnline(s) ? "online" : "offline"}</td>
                         <td>{s.os}/{s.arch}</td>
                         <td class="mono">{s.lastSeen ?? "—"}</td>
                         <td class="row-actions">
@@ -426,7 +451,7 @@
               {/if}
             </div>
             <div class="pager">
-              <button class="ghost-btn" disabled={pageIndex === 0 || loading} onclick={() => loadPage(pageIndex - 1)}
+              <button class="ghost-btn" disabled={pageIndex === 0 || listLoading} onclick={() => loadPage(pageIndex - 1)}
                 >Previous</button
               >
               <span class="muted"
@@ -434,7 +459,7 @@
               >
               <button
                 class="ghost-btn"
-                disabled={!nextPageToken || loading}
+                disabled={!nextPageToken || listLoading}
                 onclick={() => loadPage(pageIndex + 1)}>Next</button
               >
             </div>
@@ -461,7 +486,9 @@
                 >
                   <option value="">Select session…</option>
                   {#each pickerSessions as s}
-                    <option value={s.agentId}>{userAtHost(s.username, s.hostname)} · {s.agentId.slice(0, 8)}</option>
+                    <option value={s.agentId}
+                      >{isOnline(s) ? "●" : "○"} {userAtHost(s.username, s.hostname)} · {s.agentId.slice(0, 8)}</option
+                    >
                   {/each}
                 </select>
               </div>
@@ -488,11 +515,11 @@
                   class="term-input"
                   bind:this={inputEl}
                   bind:value={termInput}
-                  disabled={loading}
+                  disabled={taskBusy}
                   spellcheck="false"
                   autocomplete="off"
                   autocapitalize="off"
-                  placeholder={loading ? "waiting for task result…" : "type a command"}
+                  placeholder={taskBusy ? "waiting for task result…" : "type a command"}
                   onkeydown={onTermKeydown}
                 />
               </div>

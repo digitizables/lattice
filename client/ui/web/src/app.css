@@ -346,6 +346,14 @@ table.sessions tr.selected {
   justify-content: flex-end;
 }
 
+.status-on {
+  color: var(--ok);
+}
+
+.status-off {
+  color: var(--text-muted);
+}
+
 .empty {
   height: 100%;
   min-height: 220px;
