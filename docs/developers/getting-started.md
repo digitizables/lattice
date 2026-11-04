@@ -84,9 +84,11 @@ go mod tidy
 ## Checklist
 
 - [x] Server and agent import Buf-generated Go types
-- [ ] `postgres`, `teamserver`, and `web` come up clean in Compose
+- [x] Compose `postgres` healthy; teamserver/agent/client lab path works locally
 - [x] Binaries build (`teamserver`, `agent`, `client`)
-- [ ] End-to-end check-in + task against a live Postgres (needs Docker Desktop running)
+- [x] End-to-end check-in + task against live Postgres (`whoami` / `echo` completed in DB)
 - [ ] HTTP channel loads through a generic extension loader (currently registered in `teamserver` main)
+- [ ] Compose `teamserver` / `web` images build and run
+
 
 Operator docs go in `docs/operators/`.

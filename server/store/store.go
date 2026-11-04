@@ -148,10 +148,14 @@ FROM agents WHERE id = $1`
 
 // CreateTask inserts a queued task.
 func (s *Store) CreateTask(ctx context.Context, t Task) error {
+	args := t.Args
+	if args == nil {
+		args = []string{}
+	}
 	const q = `
 INSERT INTO tasks (id, agent_id, name, args, status)
 VALUES ($1, $2, $3, $4, 'queued')`
-	_, err := s.pool.Exec(ctx, q, t.ID, t.AgentID, t.Name, t.Args)
+	_, err := s.pool.Exec(ctx, q, t.ID, t.AgentID, t.Name, args)
 	return err
 }
 
