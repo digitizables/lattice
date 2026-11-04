@@ -52,6 +52,8 @@
   let termEl: HTMLDivElement | undefined = $state();
   let inputEl: HTMLInputElement | undefined = $state();
   let activeAbort: AbortController | null = null;
+  /** Pointer origin for drag-select; used so mouseup does not steal focus. */
+  let pointerDown: { x: number; y: number } | null = null;
 
   const session = $derived(
     pickerSessions.find((s) => s.agentId === agentId) ?? null,
@@ -81,10 +83,20 @@
     return now - t < 30_000;
   }
 
+  function hasCanvasSelection(): boolean {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return false;
+    const node = sel.anchorNode;
+    if (!node || !termEl) return false;
+    return termEl.contains(node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
+  }
+
   async function appendTerm(html: string) {
+    const keepSelection = hasCanvasSelection();
     lines = [...lines, html];
     await tick();
-    if (termEl) termEl.scrollTop = termEl.scrollHeight;
+    // Do not jump the viewport while the operator is selecting text to copy.
+    if (termEl && !keepSelection) termEl.scrollTop = termEl.scrollHeight;
   }
 
   export function clearScrollback() {
@@ -92,6 +104,7 @@
   }
 
   export function focusInput() {
+    if (hasCanvasSelection()) return;
     void tick().then(() => inputEl?.focus());
   }
 
@@ -100,8 +113,10 @@
     activeAbort.abort();
   }
 
+  let wasActive = false;
   $effect(() => {
-    if (active) focusInput();
+    if (active && !wasActive) focusInput();
+    wasActive = active;
   });
 
   $effect(() => {
@@ -109,6 +124,8 @@
     const onKey = (e: KeyboardEvent) => {
       if (!active) return;
       if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
+        // Prefer copy when scrollback text is selected.
+        if (hasCanvasSelection()) return;
         e.preventDefault();
         interrupt();
       }
@@ -206,8 +223,11 @@
   async function onKeydown(e: KeyboardEvent) {
     onFocus?.();
     if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      interrupt();
+      if (hasCanvasSelection()) return;
+      if (busy) {
+        e.preventDefault();
+        interrupt();
+      }
       return;
     }
     if (e.key === "Enter") {
@@ -329,12 +349,21 @@
       role="log"
       tabindex="0"
       bind:this={termEl}
-      onclick={() => {
+      onpointerdown={(e) => {
+        if (e.button === 0) pointerDown = { x: e.clientX, y: e.clientY };
+      }}
+      onclick={(e) => {
         onFocus?.();
+        const dragged =
+          pointerDown != null &&
+          (Math.abs(e.clientX - pointerDown.x) > 4 || Math.abs(e.clientY - pointerDown.y) > 4);
+        pointerDown = null;
+        // Keep scrollback selection for copy; only plain clicks focus the prompt.
+        if (dragged || hasCanvasSelection()) return;
         focusInput();
       }}
     >
-      {#each lines as line}
+      {#each lines as line, i (i)}
         <div class="term-line">{@html line}</div>
       {/each}
     </div>

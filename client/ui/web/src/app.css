@@ -873,6 +873,8 @@ table.sessions tr.selected {
   font-size: 13px;
   line-height: 1.45;
   cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .term-line {
@@ -882,7 +884,15 @@ table.sessions tr.selected {
   word-break: break-word;
   max-width: 100%;
   min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
   animation: slide-up 120ms ease-out;
+}
+
+.term-line::selection,
+.terminal-canvas ::selection {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text);
 }
 
 /* highlight.js token colors (command input) — dark console theme */
