@@ -492,7 +492,7 @@
                   spellcheck="false"
                   autocomplete="off"
                   autocapitalize="off"
-                  placeholder={loading ? "waiting for agent…" : "type a command"}
+                  placeholder={loading ? "waiting for task result…" : "type a command"}
                   onkeydown={onTermKeydown}
                 />
               </div>

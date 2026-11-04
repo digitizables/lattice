@@ -57,3 +57,9 @@ Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:80
 The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a listeners status view.
 
 Open a session in **Console**, then type commands and press Enter (`whoami`, `echo hi`, `hostname`). Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears.
+
+The agent process must be running while you task. If the console stays on a queued status, start:
+
+```text
+go run ./agent/cmd/agent -server https://127.0.0.1:8443
+```

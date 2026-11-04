@@ -179,6 +179,7 @@ export async function submitTaskAndWait(
 
   const started = Date.now();
   let lastStatus = "queued";
+  let queuedHintAt = 0;
   while (Date.now() - started < 120_000) {
     if (signal?.aborted) {
       throw new Error("cancelled");
@@ -188,6 +189,20 @@ export async function submitTaskAndWait(
     if (task.status && task.status !== lastStatus) {
       lastStatus = task.status;
       onStatus?.(task.status);
+    }
+    if (task.status === "queued" || task.status === "") {
+      const waited = Date.now() - started;
+      if (waited >= 8000 && waited - queuedHintAt >= 8000) {
+        queuedHintAt = waited;
+        onStatus?.(
+          "queued — no agent has picked this up; is an agent running for this session?",
+        );
+      }
+      if (waited >= 45_000) {
+        throw new Error(
+          "task still queued after 45s — start the agent (`go run ./agent/cmd/agent`) or pick a live session",
+        );
+      }
     }
     if (task.status === "completed" || task.status === "failed") {
       return task;
