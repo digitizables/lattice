@@ -598,20 +598,20 @@ table.sessions tr.selected {
 
 .term-tabbar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--page-pad-y) var(--page-pad-x) 0;
+  padding: var(--space-2) var(--page-pad-x);
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg);
   flex-shrink: 0;
-  min-height: calc(var(--tab-h) + var(--page-pad-y));
+  min-height: calc(var(--tab-h) + var(--space-2) * 2);
 }
 
 .term-tabs {
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-1);
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
   overflow-x: auto;
   flex: 1;
@@ -621,30 +621,31 @@ table.sessions tr.selected {
 .term-tab {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   max-width: 200px;
-  min-width: 96px;
+  min-width: 108px;
   height: var(--tab-h);
   border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 500;
-  padding: 0 var(--space-1) 0 var(--space-3);
+  padding: 0 var(--space-2) 0 var(--space-3);
   transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
 
 .term-tab:hover {
   color: var(--text);
   background: var(--bg-panel);
+  border-color: var(--border-soft);
 }
 
 .term-tab.active {
   color: var(--text);
   background: var(--bg-console);
   border-color: var(--border-soft);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .term-tab-main {
@@ -669,13 +670,19 @@ table.sessions tr.selected {
 .term-tab-close {
   display: inline-grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.term-tab:hover .term-tab-close,
+.term-tab.active .term-tab-close {
+  opacity: 1;
 }
 
 .term-tab-close:hover {
@@ -684,24 +691,37 @@ table.sessions tr.selected {
 }
 
 .term-tab-add {
-  align-self: center;
-  margin-bottom: var(--space-1);
   flex-shrink: 0;
+  width: var(--tab-h);
+  height: var(--tab-h);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.term-tab-add:hover {
+  color: var(--text);
+  background: var(--bg-panel);
+  border-color: var(--border-soft);
 }
 
 .term-tab-actions {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  padding-bottom: var(--space-1);
   flex-shrink: 0;
+  height: var(--tab-h);
 }
 
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: var(--control-h);
-  height: var(--control-h);
+  width: var(--tab-h);
+  height: var(--tab-h);
   padding: 0;
   border-radius: var(--radius-sm);
 }
