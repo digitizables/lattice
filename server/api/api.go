@@ -77,6 +77,33 @@ func (s *Server) SubmitTask(
 	return &operatorv1.SubmitTaskResponse{TaskId: taskID}, nil
 }
 
+func (s *Server) GetTask(
+	ctx context.Context,
+	req *operatorv1.GetTaskRequest,
+) (*operatorv1.GetTaskResponse, error) {
+	if req.GetTaskId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "task_id is required")
+	}
+	task, err := s.core.GetTask(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err.Error())
+	}
+	var exit int32
+	if task.ExitCode != nil {
+		exit = *task.ExitCode
+	}
+	return &operatorv1.GetTaskResponse{
+		Task: &operatorv1.TaskUpdated{
+			TaskId:   task.ID,
+			AgentId:  task.AgentID,
+			Status:   task.Status,
+			Stdout:   task.Stdout,
+			Stderr:   task.Stderr,
+			ExitCode: exit,
+		},
+	}, nil
+}
+
 func (s *Server) StreamEvents(
 	ctx context.Context,
 	req *operatorv1.StreamEventsRequest,

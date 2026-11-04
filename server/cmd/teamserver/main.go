@@ -17,6 +17,7 @@ import (
 	"github.com/digitizables/lattice/server/core"
 	latticecrypto "github.com/digitizables/lattice/server/crypto"
 	"github.com/digitizables/lattice/server/extensions"
+	"github.com/digitizables/lattice/server/httpx"
 	"github.com/digitizables/lattice/server/listen"
 	"github.com/digitizables/lattice/server/store"
 )
@@ -86,7 +87,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           mux,
+		Handler:           httpx.WithCORS(mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		Protocols:         protocols,
 	}

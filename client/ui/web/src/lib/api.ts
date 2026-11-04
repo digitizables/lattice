@@ -47,22 +47,31 @@ export type ListSessionsResult = {
   totalCount: number;
 };
 
-const servicePrefix = "/lattice.operator.v1.OperatorService";
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
+// Talk to the teamserver directly in lab/dev. Vite's proxy breaks Connect streams
+// and can surface as browser "Failed to fetch" while waiting on tasks.
+const servicePrefix =
+  (import.meta.env.VITE_API_BASE?.replace(/\/$/, "") || "http://127.0.0.1:8080") +
+  "/lattice.operator.v1.OperatorService";
 
 async function connectUnary<TReq extends object, TRes>(
   method: string,
   body: TReq,
 ): Promise<TRes> {
-  const res = await fetch(`${servicePrefix}/${method}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Connect-Protocol-Version": "1",
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${servicePrefix}/${method}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Connect-Protocol-Version": "1",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(
+      `Failed to reach teamserver at ${servicePrefix}. Is it running on :8080?`,
+    );
+  }
   const text = await res.text();
   if (!res.ok) {
     throw new Error(formatConnectError(text, res.statusText));
@@ -81,57 +90,6 @@ function formatConnectError(body: string, fallback: string): string {
   return body;
 }
 
-function encodeConnectJSONFrame(message: object): Uint8Array {
-  const payload = textEncoder.encode(JSON.stringify(message));
-  const out = new Uint8Array(5 + payload.length);
-  out[0] = 0;
-  const len = payload.length;
-  out[1] = (len >>> 24) & 0xff;
-  out[2] = (len >>> 16) & 0xff;
-  out[3] = (len >>> 8) & 0xff;
-  out[4] = len & 0xff;
-  out.set(payload, 5);
-  return out;
-}
-
-type ConnectFrame = { flags: number; json: Record<string, unknown> };
-
-async function* readConnectJSONFrames(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-): AsyncGenerator<ConnectFrame> {
-  let buffer = new Uint8Array(0);
-  while (true) {
-    const { done, value } = await reader.read();
-    if (value && value.length) {
-      const merged = new Uint8Array(buffer.length + value.length);
-      merged.set(buffer);
-      merged.set(value, buffer.length);
-      buffer = merged;
-    }
-    while (buffer.length >= 5) {
-      const flags = buffer[0];
-      const len = ((buffer[1] << 24) | (buffer[2] << 16) | (buffer[3] << 8) | buffer[4]) >>> 0;
-      if (buffer.length < 5 + len) break;
-      const slice = buffer.slice(5, 5 + len);
-      buffer = buffer.slice(5 + len);
-      const raw = textDecoder.decode(slice);
-      let json: Record<string, unknown> = {};
-      if (raw) {
-        try {
-          json = JSON.parse(raw) as Record<string, unknown>;
-        } catch {
-          json = { raw };
-        }
-      }
-      yield { flags, json };
-      if (flags & 0x02) {
-        return;
-      }
-    }
-    if (done) return;
-  }
-}
-
 function mapSession(raw: Record<string, unknown>): Session {
   const lastSeen = raw.lastSeen as { seconds?: string | number } | string | undefined;
   let lastSeenOut: string | undefined;
@@ -147,6 +105,17 @@ function mapSession(raw: Record<string, unknown>): Session {
     os: String(raw.os ?? ""),
     arch: String(raw.arch ?? ""),
     lastSeen: lastSeenOut,
+  };
+}
+
+function mapTask(raw: Record<string, unknown>): TaskUpdated {
+  return {
+    taskId: String(raw.taskId ?? raw.task_id ?? ""),
+    agentId: String(raw.agentId ?? raw.agent_id ?? ""),
+    status: String(raw.status ?? ""),
+    stdout: String(raw.stdout ?? ""),
+    stderr: String(raw.stderr ?? ""),
+    exitCode: Number(raw.exitCode ?? raw.exit_code ?? 0),
   };
 }
 
@@ -180,12 +149,21 @@ export async function submitTask(
   return String(data.taskId ?? "");
 }
 
+export async function getTask(taskId: string): Promise<TaskUpdated> {
+  const data = await connectUnary<{ taskId: string }, { task?: Record<string, unknown> }>(
+    "GetTask",
+    { taskId },
+  );
+  return mapTask(data.task ?? {});
+}
+
 export async function deleteSession(agentId: string): Promise<void> {
   await connectUnary<{ agentId: string }, Record<string, never>>("DeleteSession", { agentId });
 }
 
 /**
- * Opens StreamEvents first (Connect streaming content-type), then submits the task.
+ * Submit a task, then poll GetTask until the agent finishes.
+ * Avoids browser/proxy issues with long-lived Connect streams.
  */
 export async function submitTaskAndWait(
   agentId: string,
@@ -195,49 +173,43 @@ export async function submitTaskAndWait(
   onTaskId?: (taskId: string) => void,
   signal?: AbortSignal,
 ): Promise<TaskUpdated> {
-  const res = await fetch(`${servicePrefix}/StreamEvents`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/connect+json",
-      "Connect-Protocol-Version": "1",
-    },
-    body: encodeConnectJSONFrame({ agentId }),
-    signal,
-  });
-  if (!res.ok || !res.body) {
-    throw new Error(formatConnectError(await res.text(), res.statusText));
-  }
-
   const taskId = await submitTask(agentId, name, args);
   onTaskId?.(taskId);
+  onStatus?.("queued");
 
-  const reader = res.body.getReader();
-  for await (const frame of readConnectJSONFrames(reader)) {
-    if (frame.flags & 0x02) {
-      const errMsg = frame.json.message;
-      if (typeof errMsg === "string" && errMsg) {
-        throw new Error(errMsg);
-      }
-      break;
+  const started = Date.now();
+  let lastStatus = "queued";
+  while (Date.now() - started < 120_000) {
+    if (signal?.aborted) {
+      throw new Error("cancelled");
     }
-    const taskUpdated = (frame.json.taskUpdated ?? frame.json.task_updated) as
-      | Record<string, unknown>
-      | undefined;
-    if (!taskUpdated) continue;
-    const updated: TaskUpdated = {
-      taskId: String(taskUpdated.taskId ?? taskUpdated.task_id ?? ""),
-      agentId: String(taskUpdated.agentId ?? taskUpdated.agent_id ?? ""),
-      status: String(taskUpdated.status ?? ""),
-      stdout: String(taskUpdated.stdout ?? ""),
-      stderr: String(taskUpdated.stderr ?? ""),
-      exitCode: Number(taskUpdated.exitCode ?? taskUpdated.exit_code ?? 0),
-    };
-    if (updated.taskId !== taskId) continue;
-    onStatus?.(updated.status);
-    if (updated.status === "completed" || updated.status === "failed") {
-      await reader.cancel().catch(() => undefined);
-      return updated;
+    await sleep(400, signal);
+    const task = await getTask(taskId);
+    if (task.status && task.status !== lastStatus) {
+      lastStatus = task.status;
+      onStatus?.(task.status);
+    }
+    if (task.status === "completed" || task.status === "failed") {
+      return task;
     }
   }
-  throw new Error("stream ended before task completed");
+  throw new Error("timed out waiting for agent");
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("cancelled"));
+      return;
+    }
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(t);
+        reject(new Error("cancelled"));
+      },
+      { once: true },
+    );
+  });
 }
