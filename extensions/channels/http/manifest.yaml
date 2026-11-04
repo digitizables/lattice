@@ -1,0 +1,7 @@
+name: http
+kind: channel
+version: 0.1.0
+protocol:
+  min: lattice.agent.v1
+description: HTTPS Protobuf check-in and task result channel for the reference agent.
+entrypoint: channel.go

@@ -2,56 +2,93 @@
 
 Get one full path working before anything else: from the operator through the server and HTTP channel to the agent, then back with a result. By then Compose should be up with Postgres, the teamserver, and nginx for the UI.
 
+## Progress
+
+| Step | Status |
+|------|--------|
+| Protocol (`protocol/lattice/...`, Buf generate into `gen/`) | Done |
+| Store (`server/store`, goose + pgx) | Done |
+| Core (`server/core`) | Done |
+| Config (`server/config`) | Done |
+| HTTP channel + listen manager | Done (cleartext HTTP for lab; TLS helper present) |
+| Agent runtime / transport | Done (`whoami`, `echo`, `hostname`) |
+| Connect API + CLI | Done (`sessions`, `task`; `StreamEvents` stub) |
+| Extension loader / remote install | Pending |
+| Web UI | Pending |
+| Compose teamserver/web images | Scaffold only |
+
+### Lab run (once Postgres is up)
+
+```text
+docker compose -f packager/docker/docker-compose.yml up -d postgres
+
+go run ./server/cmd/teamserver
+go run ./agent/cmd/agent -server http://127.0.0.1:8443
+go run ./client/cmd/client sessions
+go run ./client/cmd/client task <agent_id> whoami
+```
+
+Env defaults:
+
+- `LATTICE_DATABASE_URL` = `postgres://lattice:lattice@127.0.0.1:5432/lattice?sslmode=disable`
+- `LATTICE_HTTP_ADDR` = `:8080` (Connect operator API)
+- `LATTICE_AGENT_ADDR` = `:8443` (HTTP channel)
+- `LATTICE_API_URL` = `http://127.0.0.1:8080` (CLI)
+
+Regenerate stubs after proto edits:
+
+```text
+cd protocol
+buf dep update
+buf generate
+cd ..
+go mod tidy
+```
+
 ## Stack
 
-- **Teamserver, CLI, reference agent:** Go 1.23
+- **Teamserver, CLI, reference agent:** Go (module `go 1.26`)
 - **Web UI:** TypeScript, Vite, Svelte (`client/ui/web`)
 - **Schemas / codegen:** Protobuf + [Buf](https://buf.build)
-- **Operator and server:** [Connect](https://connectrpc.com) over HTTP/2 (Protobuf). Same services for CLI and browser. Live updates via Connect server streaming.
-- **Agent and server (v1 channel):** HTTPS, Protobuf bodies
+- **Operator and server:** Connect v2 (`connectrpc.com/connect/v2` + `connecthttp`)
+- **Agent and server (v1 channel):** HTTP(S), Protobuf bodies at `/v1/checkin` and `/v1/result`
 - **DB:** PostgreSQL 16
-- **Config / profiles:** YAML
+- **Config / profiles:** env for server (`LATTICE_*`); YAML profiles for channels
 - **Logs:** `log/slog`
-- **Compose services:** `postgres`, `teamserver`, `web` (nginx serves the Vite build)
+- **Compose services:** `postgres`, `teamserver`, `web`
 
-Keep server, CLI, and the reference agent in Go so `protocol/` only has to generate one Go type set. The UI uses Buf's TypeScript output from those same protos.
-
-### Go modules
+### Go modules in use
 
 - `google.golang.org/protobuf`
-- `connectrpc.com/connect`
-- `github.com/spf13/cobra`
-- `github.com/spf13/viper`
+- `connectrpc.com/connect/v2`
+- `connectrpc.com/connect/v2/connecthttp`
+- `github.com/google/uuid`
 - `github.com/jackc/pgx/v5`
 - `github.com/pressly/goose/v3`
-- `github.com/go-chi/chi/v5` (agent listeners and other plain HTTP)
 
-### Web packages
+### Web packages (not started)
 
 - `svelte`, `@sveltejs/vite-plugin-svelte`, `vite`, `typescript`
-- Connect TS client from Buf (`protocol/`)
 
 ## Build order
 
-1. **`protocol/`** - check-in, task, result messages; Connect services for sessions, tasking, events. Generate Go from Buf now; TypeScript when you start the UI.
-2. **`server/store`** - goose migrations (operators, sessions, tasks, results); talk to the DB with pgx.
-3. **`server/core`** - session registry + task queue on top of the store.
-4. **`extensions/channels/http`** + **`server/listen`** - one HTTPS listener on chi, behind a channel interface.
-5. **`agent/runtime`** + **`agent/transport`** - check in, pull work, run something trivial, post results.
-6. **`server/api`** - Connect handlers, simple password/token auth, sessions, tasking, event stream.
-7. **`client` CLI** - login, sessions, task, start HTTP listener.
-8. **`packager/docker`** - Compose for `postgres`, `teamserver`, `web`; teamserver gets a `data/` volume.
-9. **Extension loader** - HTTP channel registers via manifest (so the next channel doesn't mean rewriting `core`).
-10. **Web UI** - login, sessions, task box, live output over the same Connect services as the CLI.
-
-Then: generate, loot, real multiplayer/RBAC, more channels, modules, installing extensions from elsewhere.
+1. **`protocol/`** - done
+2. **`server/store`** - done
+3. **`server/core`** - done
+4. **`extensions/channels/http`** + **`server/listen`** - done
+5. **`agent/runtime`** + **`agent/transport`** - done
+6. **`server/api`** - done (streaming events still stubbed)
+7. **`client` CLI** - done for sessions/task
+8. **`packager/docker`** - Postgres service ready; images wait on polished release flow
+9. **Extension loader** - next
+10. **Web UI** - after API stabilizes
 
 ## Checklist
 
-- Server and agent both import the Buf-generated Go types
-- `postgres`, `teamserver`, and `web` come up clean in Compose
-- Agent check-in leaves a session row
-- CLI can task an agent and print the output
-- HTTP channel loads as a plugin through the listen interface
+- [x] Server and agent import Buf-generated Go types
+- [ ] `postgres`, `teamserver`, and `web` come up clean in Compose
+- [x] Binaries build (`teamserver`, `agent`, `client`)
+- [ ] End-to-end check-in + task against a live Postgres (needs Docker Desktop running)
+- [ ] HTTP channel loads through a generic extension loader (currently registered in `teamserver` main)
 
-Operator docs go in `docs/operators/`. Extension author docs can live with the templates under `extensions/` when those exist.
+Operator docs go in `docs/operators/`.
