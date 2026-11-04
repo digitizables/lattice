@@ -223,25 +223,36 @@ export async function submitTaskAndWait(
       // best-effort
     }
   };
-  if (signal) {
-    if (signal.aborted) {
-      await abortRemote();
-      throw new Error("^C");
-    }
-    signal.addEventListener("abort", () => {
-      void abortRemote();
-    }, { once: true });
+  if (signal?.aborted) {
+    await abortRemote();
+    throw new Error("^C");
   }
+  signal?.addEventListener(
+    "abort",
+    () => {
+      void abortRemote();
+    },
+    { once: true },
+  );
 
   const started = Date.now();
   let lastStatus = "queued";
   let queuedHintAt = 0;
   while (Date.now() - started < 120_000) {
     if (signal?.aborted) {
+      await abortRemote();
       throw new Error("^C");
     }
-    await sleep(400, signal);
+    try {
+      await sleep(400, signal);
+    } catch {
+      await abortRemote();
+      throw new Error("^C");
+    }
     const task = await getTask(taskId);
+    if (signal?.aborted || task.status === "cancelled") {
+      throw new Error("^C");
+    }
     if (task.status && task.status !== lastStatus) {
       lastStatus = task.status;
       onStatus?.(task.status);
@@ -255,13 +266,11 @@ export async function submitTaskAndWait(
         );
       }
       if (waited >= 20_000) {
+        await abortRemote();
         throw new Error(
           "task still queued after 20s — that session is probably offline. Pick an online session or run: go run ./agent/cmd/agent -server https://127.0.0.1:8443",
         );
       }
-    }
-    if (task.status === "cancelled") {
-      throw new Error("^C");
     }
     if (task.status === "completed" || task.status === "failed") {
       return task;
@@ -273,7 +282,7 @@ export async function submitTaskAndWait(
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new Error("cancelled"));
+      reject(new Error("^C"));
       return;
     }
     const t = setTimeout(resolve, ms);
@@ -281,7 +290,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       "abort",
       () => {
         clearTimeout(t);
-        reject(new Error("cancelled"));
+        reject(new Error("^C"));
       },
       { once: true },
     );

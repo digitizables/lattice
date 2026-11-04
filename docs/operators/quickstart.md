@@ -67,7 +67,9 @@ Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:80
 
 The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a listeners status view.
 
-Open a session in **Console**, then type commands and press Enter. The shell starts at `C:\` (Windows) or `/` (Unix). Examples: `pwd`, `cd Windows`, `dir`, `powershell Get-Date`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears, **Ctrl+C** aborts a running task.
+Open a session in **Console**, then type commands and press Enter. The shell starts at `C:\` (Windows) or `/` (Unix). Examples: `pwd`, `cd Windows`, `dir`, `powershell Get-Date`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears, **Ctrl+C** cancels a queued or running task.
+
+The agent is a separate process on the target. It only checks in while that process is alive (for lab: keep `.\bin\agent.exe -server https://127.0.0.1:8443` running). Offline sessions will not drain the task queue.
 
 **Settings** (gear in the sidebar) → **Terminal** controls full vs partial path in the prompt.
 

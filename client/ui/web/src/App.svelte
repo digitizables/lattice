@@ -285,7 +285,7 @@
       await appendTerm('<span class="term-muted">Agent builtins: whoami, echo, hostname, pwd, cd</span>');
       await appendTerm('<span class="term-muted">Shells: shell|cmd|powershell &lt;line&gt; · or type a native command (dir, ls, …)</span>');
       await appendTerm('<span class="term-muted">Working directory starts at C:\\ or / and persists with cd.</span>');
-      await appendTerm('<span class="term-muted">Ctrl+C aborts a running task. Oversized output is truncated at 256KiB.</span>');
+      await appendTerm('<span class="term-muted">Ctrl+C cancels a queued or running task. Oversized output is truncated at 256KiB.</span>');
       await appendTerm('<span class="term-muted">Local: help, clear, sessions [query], use &lt;agent_id&gt;</span>');
       return;
     }
@@ -333,13 +333,16 @@
     }
   }
 
+  function interruptTask() {
+    if (!taskBusy || !activeAbort) return;
+    activeAbort.abort();
+    void appendTerm('<span class="term-muted">^C — cancelled</span>');
+  }
+
   async function onTermKeydown(e: KeyboardEvent) {
     if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
-      if (taskBusy && activeAbort) {
-        e.preventDefault();
-        activeAbort.abort();
-        await appendTerm('<span class="term-muted">interrupt sent — waiting for agent to stop…</span>');
-      }
+      e.preventDefault();
+      interruptTask();
       return;
     }
     if (e.key === "Enter") {
@@ -370,9 +373,22 @@
     }
     if (e.key === "l" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      termLines = [];
+      if (!taskBusy) bootConsoleBanner(selected);
     }
   }
+
+  // Ctrl+C must work even while the input would otherwise ignore keys.
+  $effect(() => {
+    if (!taskBusy) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        interruptTask();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  });
 
   $effect(() => {
     void loadPage(0);
@@ -605,11 +621,11 @@
                   class="term-input"
                   bind:this={inputEl}
                   bind:value={termInput}
-                  disabled={taskBusy}
+                  readonly={taskBusy}
                   spellcheck="false"
                   autocomplete="off"
                   autocapitalize="off"
-                  placeholder={taskBusy ? "waiting for task result…" : "type a command"}
+                  placeholder={taskBusy ? "waiting — Ctrl+C to cancel" : "type a command"}
                   onkeydown={onTermKeydown}
                 />
               </div>
