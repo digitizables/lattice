@@ -52,4 +52,6 @@ npm run dev
 
 Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:8080`.
 
-The UI follows the Secret-style shell from the Lattice Figma file (`C2 · Terminal Emulator`): title bar, icon sidebar, folder tabs, split sessions/task panes, and a bottom terminal dock for live task output.
+The UI follows the Secret-style shell from the Lattice Figma file (`C2 · Terminal Emulator`): title bar, icon sidebar, folder tabs, split sessions/task panes, and a bottom terminal dock.
+
+Type in the dock and press Enter to task the selected agent (`whoami`, `echo hi`, `hostname`). Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears.
