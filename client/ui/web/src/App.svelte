@@ -362,12 +362,10 @@
               </div>
             </div>
             <div class="pane-body settings-page">
-              <section class="settings-card">
-                <header class="settings-card-head">
-                  <div>
-                    <h3>Terminal</h3>
-                    <p>Prompt appearance for the operator console.</p>
-                  </div>
+              <section class="settings-section">
+                <header class="settings-section-head">
+                  <h3>Terminal</h3>
+                  <p>Prompt appearance for the operator console.</p>
                 </header>
 
                 <div class="settings-field">
@@ -412,12 +410,10 @@
                 </div>
               </section>
 
-              <section class="settings-card">
-                <header class="settings-card-head">
-                  <div>
-                    <h3>Connection</h3>
-                    <p>Where this UI talks to Lattice. Read-only in the lab build.</p>
-                  </div>
+              <section class="settings-section">
+                <header class="settings-section-head">
+                  <h3>Connection</h3>
+                  <p>Where this UI talks to Lattice. Read-only in the lab build.</p>
                 </header>
                 <div class="settings-kv">
                   <div>

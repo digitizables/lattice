@@ -178,7 +178,7 @@ button {
   height: 40px;
   width: 100%;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   display: flex;
@@ -410,31 +410,35 @@ table.sessions tr.selected {
 }
 
 .settings-page {
-  display: grid;
-  gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
   max-width: 720px;
-  padding-bottom: var(--space-6);
 }
 
-.settings-card {
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
-  background: var(--bg);
-  overflow: hidden;
-}
-
-.settings-card-head {
-  padding: var(--space-4);
+.settings-section {
   border-bottom: 1px solid var(--border-soft);
+  padding: 0 0 var(--space-4);
+  margin: 0 0 var(--space-4);
 }
 
-.settings-card-head h3 {
+.settings-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.settings-section-head {
+  margin: 0 0 var(--space-3);
+}
+
+.settings-section-head h3 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
 }
 
-.settings-card-head p {
+.settings-section-head p {
   margin: var(--space-1) 0 0;
   font-size: 12px;
   color: var(--text-muted);
@@ -445,8 +449,9 @@ table.sessions tr.selected {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-5);
-  padding: var(--space-4);
+  gap: var(--space-4);
+  padding: 0;
+  margin: 0 0 var(--space-3);
 }
 
 .settings-field-label {
@@ -471,7 +476,7 @@ table.sessions tr.selected {
   flex-shrink: 0;
   height: var(--control-h);
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--bg-input);
 }
@@ -497,7 +502,7 @@ table.sessions tr.selected {
 }
 
 .settings-preview {
-  padding: 0 var(--space-4) var(--space-4);
+  padding: 0;
   display: grid;
   gap: var(--space-2);
 }
@@ -511,7 +516,7 @@ table.sessions tr.selected {
 
 .settings-preview-box {
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   background: var(--bg-console);
   padding: var(--space-3) var(--space-4);
   font-size: 13px;
@@ -527,6 +532,9 @@ table.sessions tr.selected {
 .settings-kv {
   display: grid;
   gap: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
 .settings-kv > div {
@@ -578,11 +586,11 @@ table.sessions tr.selected {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--page-pad-x) 0;
+  padding: var(--page-pad-y) var(--page-pad-x) 0;
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg);
   flex-shrink: 0;
-  min-height: calc(var(--tab-h) + var(--space-2));
+  min-height: calc(var(--tab-h) + var(--page-pad-y));
 }
 
 .term-tabs {
@@ -604,7 +612,7 @@ table.sessions tr.selected {
   height: var(--tab-h);
   border: 1px solid transparent;
   border-bottom: none;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
@@ -722,7 +730,7 @@ table.sessions tr.selected {
   min-width: 180px;
   padding: var(--space-1);
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   display: grid;
@@ -736,7 +744,7 @@ table.sessions tr.selected {
   gap: var(--space-3);
   width: 100%;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   font-size: 12px;
@@ -1065,15 +1073,13 @@ table.sessions tr.selected {
   min-height: 0;
 }
 
-.docs-page {
+.docs-split {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  gap: var(--space-4);
+  grid-template-columns: 260px minmax(0, 1fr);
   align-items: stretch;
   overflow: hidden;
-  padding-bottom: var(--space-4);
 }
 
 .docs-rail {
@@ -1081,6 +1087,26 @@ table.sessions tr.selected {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  border-right: 1px solid var(--border-soft);
+  background: var(--bg);
+}
+
+.docs-rail-head {
+  padding: var(--page-pad-y) var(--page-pad-x);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.docs-rail-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.docs-rail-head p {
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .docs-toc {
@@ -1097,22 +1123,21 @@ table.sessions tr.selected {
   display: grid;
   gap: var(--space-1);
   text-align: left;
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
+  border: none;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
-  padding: var(--space-3);
-  transition: background 140ms ease, border-color 140ms ease;
+  padding: var(--space-2) var(--space-3);
+  transition: background 140ms ease, color 140ms ease;
 }
 
 .docs-toc-item:hover {
   background: #1c1c1c;
-  border-color: var(--border-soft);
 }
 
 .docs-toc-item.active {
   background: #222;
-  border-color: var(--border-soft);
+  color: var(--text);
 }
 
 .docs-toc-title {
@@ -1131,10 +1156,22 @@ table.sessions tr.selected {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  background: var(--bg);
+}
+
+.docs-article-head {
+  padding: var(--page-pad-y) var(--page-pad-x);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.docs-article-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .docs-article-head .docs-path {
-  margin-top: 6px;
+  margin: var(--space-1) 0 0;
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -1143,7 +1180,7 @@ table.sessions tr.selected {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: var(--space-4) var(--space-5) var(--space-6);
+  padding: var(--page-pad-y) var(--page-pad-x) var(--space-6);
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-secondary);
@@ -1229,7 +1266,7 @@ table.sessions tr.selected {
   overflow: auto;
   background: var(--bg-console);
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
 }
 
 .docs-prose pre code {
@@ -1277,13 +1314,15 @@ table.sessions tr.selected {
 }
 
 @media (max-width: 900px) {
-  .docs-page {
+  .docs-split {
     grid-template-columns: 1fr;
     overflow: auto;
   }
 
   .docs-rail {
-    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+    max-height: 240px;
   }
 
   .docs-article {

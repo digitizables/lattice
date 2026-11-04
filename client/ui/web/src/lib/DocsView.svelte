@@ -78,14 +78,12 @@
     </div>
   </div>
 
-  <div class="pane-body docs-page">
-    <aside class="docs-rail settings-card">
-      <header class="settings-card-head">
-        <div>
-          <h3>{currentSet.label}</h3>
-          <p>{currentSet.description}</p>
-        </div>
-      </header>
+  <div class="docs-split">
+    <aside class="docs-rail" aria-label="{currentSet.label} documents">
+      <div class="docs-rail-head">
+        <h3>{currentSet.label}</h3>
+        <p>{currentSet.description}</p>
+      </div>
       <nav class="docs-toc" aria-label="Documents in this set">
         {#each currentSet.docs as doc}
           <button
@@ -101,12 +99,10 @@
       </nav>
     </aside>
 
-    <article class="docs-article settings-card">
-      <header class="settings-card-head docs-article-head">
-        <div>
-          <h3>{currentDoc.title}</h3>
-          <p class="mono docs-path">{currentDoc.id}.md</p>
-        </div>
+    <article class="docs-article">
+      <header class="docs-article-head">
+        <h3>{currentDoc.title}</h3>
+        <p class="mono docs-path">{currentDoc.id}.md</p>
       </header>
       <!-- Trusted first-party markdown bundled at build time.
            Click handler only remaps in-set relative links; real <a> keys still work. -->
