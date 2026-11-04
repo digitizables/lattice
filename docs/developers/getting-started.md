@@ -31,10 +31,6 @@ Server, CLI, and the reference agent stay in Go so `protocol/` generates one set
 - `svelte`, `@sveltejs/vite-plugin-svelte`, `vite`, `typescript`
 - Connect TypeScript client generated from `protocol/` via Buf
 
-### Out of scope for v1
-
-Next.js, React, Electron, gRPC-Gateway, MessagePack agent bodies, SQLite, Kafka, RabbitMQ, Kubernetes, ORMs, and a non-Go reference agent.
-
 ## Build order
 
 1. **`protocol/`:** `AgentCheckIn`, `Task`, `TaskResult`, plus Connect services for sessions, tasking, and event streams. Generate Go with Buf; generate TypeScript when the UI starts.
