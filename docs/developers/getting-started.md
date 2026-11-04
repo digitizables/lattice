@@ -4,18 +4,16 @@ Get one full path working before anything else: from the operator through the se
 
 ## Progress
 
-| Step | Status |
-|------|--------|
-| Protocol (`protocol/lattice/...`, Buf generate into `gen/`) | Done |
-| Store (`server/store`, goose + pgx) | Done |
-| Core (`server/core`) | Done |
-| Config (`server/config`) | Done |
-| HTTP channel + listen manager | Done (cleartext HTTP for lab; TLS helper present) |
-| Agent runtime / transport | Done (`whoami`, `echo`, `hostname`) |
-| Connect API + CLI | Done (`sessions`, `task`; `StreamEvents` stub) |
-| Extension loader / remote install | Pending |
-| Web UI | Pending |
-| Compose teamserver/web images | Scaffold only |
+- **Protocol** (`protocol/lattice/...`, Buf generate into `gen/`): Done
+- **Store** (`server/store`, goose + pgx): Done
+- **Core** (`server/core`): Done
+- **Config** (`server/config`): Done
+- **HTTP channel + listen manager**: Done (cleartext HTTP for lab; TLS helper present)
+- **Agent runtime / transport**: Done (`whoami`, `echo`, `hostname`)
+- **Connect API + CLI**: Done (`sessions`, `task`; `StreamEvents` stub)
+- **Extension loader / remote install**: Pending
+- **Web UI**: Pending
+- **Compose teamserver/web images**: Scaffold only
 
 ### Lab run (once Postgres is up)
 
