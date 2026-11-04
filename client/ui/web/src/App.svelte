@@ -259,7 +259,7 @@
                 <div class="empty">
                   <strong>{query ? "No matches" : "No sessions yet"}</strong>
                   <span
-                    >{#if query}Try a different query.{:else}Start an agent against <span class="mono">https://127.0.0.1:8443</span>.{/if}</span
+                    >{#if query}Try a different query.{:else}Start the Docker lab agent (<span class="mono">packager/docker/docker-compose.lab.yml</span>) or point an implant at <span class="mono">https://127.0.0.1:8443</span>.{/if}</span
                   >
                 </div>
               {:else}

@@ -1,0 +1,12 @@
+**/.git
+**/node_modules
+**/dist
+bin/
+data/certs/
+data/updates/
+data/modules/
+**/*.exe
+**/*.exe~
+**/.DS_Store
+**/.grok
+client/ui/web/dist

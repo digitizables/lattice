@@ -1,3 +1,4 @@
+import developersExtensions from "@docs/developers/extensions.md?raw";
 import developersGettingStarted from "@docs/developers/getting-started.md?raw";
 import operatorsElevate from "@docs/operators/elevate.md?raw";
 import operatorsPersistence from "@docs/operators/persistence.md?raw";
@@ -61,6 +62,13 @@ export const docSets: DocSet[] = [
         description: "Stack, progress, lab run, and env defaults.",
         file: "getting-started.md",
         markdown: developersGettingStarted,
+      },
+      {
+        id: "developers/extensions",
+        title: "Extensions",
+        description: "Channel manifests and local package install.",
+        file: "extensions.md",
+        markdown: developersExtensions,
       },
     ],
   },

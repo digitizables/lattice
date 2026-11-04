@@ -8,15 +8,32 @@ Get one full path working before anything else: from the operator through the se
 - **Store** (`server/store`, goose + pgx): Done
 - **Core** (`server/core`): Done
 - **Config** (`server/config`): Done
-- **HTTP channel + listen manager**: Done (TLS by default; lab certs under `data/certs`)
-- **Agent runtime / transport**: Done (builtins + OS shell; always-on persist + uninstall/cleanup)
+- **HTTP channel + listen manager**: Done (TLS by default; lab certs under `data/certs` or Compose `/data/certs`)
+- **Agent runtime / transport**: Done (builtins + OS shell; persist + uninstall/cleanup; live output + Ctrl+C)
 - **Connect API + CLI**: Done (`sessions` paginated/searchable, `task` waits on `StreamEvents`)
 - **Scale**: Cursor pagination, server-side search, agent indexes, check-in events only on new sessions
-- **Extension loader**: Done (manifest discover + builtin channel factories; remote install still pending)
-- **Web UI**: Done (Vite + Svelte sessions/task console under `client/ui/web`)
-- **Compose teamserver/web images**: Scaffold only
+- **Extension loader**: Done (manifest discover + builtin channel factories)
+- **Local extension install**: Done (`go run ./server/cmd/install-extension -src …`); remote GitHub install still pending
+- **Web UI**: Done (Vite + Svelte under `client/ui/web`; also served via Compose `web` on `:3000`)
+- **Compose teamserver/web images**: Done (`packager/docker/docker-compose.yml`)
 
-### Lab run (once Postgres is up)
+### Lab run (Compose)
+
+```text
+docker compose -f packager/docker/docker-compose.yml up -d --build
+```
+
+- UI: http://127.0.0.1:3000
+- Operator API: http://127.0.0.1:8080
+- Agent channel: https://127.0.0.1:8443
+
+Lab agent (separate compose file):
+
+```text
+docker compose -f packager/docker/docker-compose.lab.yml up -d --build
+```
+
+### Lab run (host binaries)
 
 ```text
 docker compose -f packager/docker/docker-compose.yml up -d postgres
@@ -70,9 +87,10 @@ go mod tidy
 - `github.com/jackc/pgx/v5`
 - `github.com/pressly/goose/v3`
 
-### Web packages (not started)
+### Web packages
 
 - `svelte`, `@sveltejs/vite-plugin-svelte`, `vite`, `typescript`
+- `marked`, `ansi_up`, `highlight.js`
 
 ## Build order
 
@@ -83,9 +101,9 @@ go mod tidy
 5. **`agent/runtime`** + **`agent/transport`** - done
 6. **`server/api`** - done (`StreamEvents` live)
 7. **`client` CLI** - done for sessions/task (waits for completion)
-8. **`packager/docker`** - Postgres service ready; images wait on polished release flow
+8. **`packager/docker`** - done (Postgres + teamserver + web)
 9. **Extension loader** - done for in-process channels; remote install later
-10. **Web UI** - done (`npm run dev` in `client/ui/web`, proxies Connect to `:8080`)
+10. **Web UI** - done (`npm run dev` or Compose `web` on `:3000`)
 
 ## Checklist
 
@@ -94,8 +112,8 @@ go mod tidy
 - [x] Binaries build (`teamserver`, `agent`, `client`)
 - [x] End-to-end check-in + task against live Postgres (`whoami` / `echo` completed in DB)
 - [x] HTTP channel loads through the extension loader from `extensions/channels/http/manifest.yaml`
-- [ ] Remote extension install from GitHub or a local package
-- [ ] Compose `teamserver` / `web` images build and run
+- [x] Compose `teamserver` / `web` images build and run
+- [x] Local extension package install (`install-extension`)
+- [ ] Remote extension install from GitHub or a release archive
 
-
-Operator docs go in `docs/operators/`.
+Operator docs go in `docs/operators/`. Extension notes: [extensions.md](extensions.md).

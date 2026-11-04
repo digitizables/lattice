@@ -1,14 +1,30 @@
-# Placeholder until the teamserver binary exists.
-# Build will fail until server/cmd/teamserver is implemented.
-FROM golang:1.23-bookworm AS build
+# Teamserver image: operator API (:8080) + agent channel (:8443).
+FROM golang:1.26-bookworm AS build
 WORKDIR /src
-COPY go.mod go.sum* ./
+COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /out/teamserver ./server/cmd/teamserver
+# gen/ is gitignored; regenerate when missing so CI/fresh checkouts still build.
+RUN if [ ! -f gen/lattice/operator/v1/operator.pb.go ]; then \
+      go install github.com/bufbuild/buf/cmd/buf@v1.47.2 && \
+      cd protocol && buf dep update && buf generate; \
+    fi
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/teamserver ./server/cmd/teamserver
 
-FROM gcr.io/distroless/static-debian12:nonroot
-COPY --from=build /out/teamserver /teamserver
-USER nonroot:nonroot
-EXPOSE 8080
-ENTRYPOINT ["/teamserver"]
+FROM debian:bookworm-slim
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /data/certs /data/updates /data/modules /extensions
+COPY --from=build /out/teamserver /usr/local/bin/teamserver
+COPY extensions/channels /extensions/channels
+ENV LATTICE_HTTP_ADDR=":8080" \
+    LATTICE_AGENT_ADDR=":8443" \
+    LATTICE_EXTENSIONS_DIR="/extensions" \
+    LATTICE_CERT_DIR="/data/certs" \
+    LATTICE_UPDATES_DIR="/data/updates" \
+    LATTICE_MODULES_DIR="/data/modules" \
+    LATTICE_ALLOW_LOCAL_AGENTS="false"
+WORKDIR /data
+EXPOSE 8080 8443
+ENTRYPOINT ["/usr/local/bin/teamserver"]
