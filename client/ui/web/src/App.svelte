@@ -1,6 +1,13 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { accountName, listSessions, submitTaskAndWait, userAtHost, type Session } from "./lib/api";
+  import {
+    accountName,
+    deleteSession,
+    listSessions,
+    submitTaskAndWait,
+    userAtHost,
+    type Session,
+  } from "./lib/api";
 
   type NavId = "sessions" | "console" | "listeners";
 
@@ -100,11 +107,21 @@
       await refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      error = msg;
       await appendTerm(`<span class="term-err">${escapeHtml(msg)}</span>`);
     } finally {
       loading = false;
       focusTerminal();
+    }
+  }
+
+  async function removeSession(agentId: string) {
+    error = "";
+    try {
+      await deleteSession(agentId);
+      if (selectedAgent === agentId) selectedAgent = "";
+      await refresh();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -289,13 +306,20 @@
                         <td>{userAtHost(s.username, s.hostname)}</td>
                         <td>{s.os}/{s.arch}</td>
                         <td class="mono">{s.lastSeen ?? "—"}</td>
-                        <td>
+                        <td class="row-actions">
                           <button
                             class="ghost-btn"
                             onclick={(e) => {
                               e.stopPropagation();
                               openConsole(s.agentId);
                             }}>Console</button
+                          >
+                          <button
+                            class="ghost-btn"
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              void removeSession(s.agentId);
+                            }}>Remove</button
                           >
                         </td>
                       </tr>

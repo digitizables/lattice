@@ -47,6 +47,19 @@ func (s *Server) ListSessions(
 	return resp, nil
 }
 
+func (s *Server) DeleteSession(
+	ctx context.Context,
+	req *operatorv1.DeleteSessionRequest,
+) (*operatorv1.DeleteSessionResponse, error) {
+	if req.GetAgentId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "agent_id is required")
+	}
+	if err := s.core.DeleteSession(ctx, req.GetAgentId()); err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err.Error())
+	}
+	return &operatorv1.DeleteSessionResponse{}, nil
+}
+
 func (s *Server) SubmitTask(
 	ctx context.Context,
 	req *operatorv1.SubmitTaskRequest,

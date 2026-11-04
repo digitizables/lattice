@@ -100,6 +100,18 @@ ON CONFLICT (id) DO UPDATE SET
 	return err
 }
 
+// DeleteAgent removes an agent and cascaded tasks.
+func (s *Store) DeleteAgent(ctx context.Context, id string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM agents WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("agent %s not found", id)
+	}
+	return nil
+}
+
 // ListAgents returns all agents, newest check-in first.
 func (s *Store) ListAgents(ctx context.Context) ([]Agent, error) {
 	const q = `

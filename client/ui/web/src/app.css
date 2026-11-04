@@ -305,6 +305,12 @@ table.sessions tr.selected {
   background: #252525;
 }
 
+.row-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .empty {
   height: 100%;
   min-height: 220px;

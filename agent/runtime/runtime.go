@@ -10,16 +10,18 @@ import (
 	"strings"
 	"time"
 
-	agentv1 "github.com/digitizables/lattice/gen/lattice/agent/v1"
+	"github.com/digitizables/lattice/agent/identity"
 	"github.com/digitizables/lattice/agent/transport"
+	agentv1 "github.com/digitizables/lattice/gen/lattice/agent/v1"
 )
 
 // Agent is the reference implant loop.
 type Agent struct {
-	ID       string
-	Sleep    time.Duration
+	ID        string
+	Sleep     time.Duration
 	Transport *transport.HTTP
-	Log      *slog.Logger
+	Log       *slog.Logger
+	IDFile    string // when set, persist server-assigned id across restarts
 }
 
 // Run check-ins until ctx is cancelled.
@@ -62,7 +64,17 @@ func (a *Agent) beat(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.ID = resp.GetAgentId()
+	if id := resp.GetAgentId(); id != "" {
+		changed := id != a.ID
+		a.ID = id
+		if changed && a.IDFile != "" {
+			if err := identity.Save(a.IDFile, a.ID); err != nil {
+				a.Log.Warn("persist agent id failed", "path", a.IDFile, "err", err)
+			} else {
+				a.Log.Info("persisted agent id", "path", a.IDFile, "agent_id", a.ID)
+			}
+		}
+	}
 	a.Log.Info("check-in ok", "agent_id", a.ID, "tasks", len(resp.GetTasks()))
 
 	for _, t := range resp.GetTasks() {

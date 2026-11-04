@@ -26,7 +26,7 @@ go run ./client/cmd/client sessions
 go run ./client/cmd/client task <agent_id> whoami
 ```
 
-The agent defaults to `-insecure` so lab self-signed certs work. Set `-insecure=false` when using a real certificate.
+The agent defaults to `-insecure` so lab self-signed certs work. Set `-insecure=false` when using a real certificate. Agent IDs persist to the OS config dir (or `-id-file`) so restarts do not create duplicate sessions.
 
 Env defaults:
 

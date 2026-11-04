@@ -100,6 +100,14 @@ func (c *Core) ListSessions(ctx context.Context) ([]store.Agent, error) {
 	return c.store.ListAgents(ctx)
 }
 
+// DeleteSession removes a session/agent row.
+func (c *Core) DeleteSession(ctx context.Context, agentID string) error {
+	if agentID == "" {
+		return fmt.Errorf("agent_id is required")
+	}
+	return c.store.DeleteAgent(ctx, agentID)
+}
+
 // GetTask returns one task by id.
 func (c *Core) GetTask(ctx context.Context, taskID string) (store.Task, error) {
 	return c.store.GetTask(ctx, taskID)

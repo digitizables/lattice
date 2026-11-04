@@ -36,6 +36,8 @@ export type TaskUpdated = {
 };
 
 const servicePrefix = "/lattice.operator.v1.OperatorService";
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
 async function connectUnary<TReq extends object, TRes>(
   method: string,
@@ -51,9 +53,71 @@ async function connectUnary<TReq extends object, TRes>(
   });
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(text || res.statusText);
+    throw new Error(formatConnectError(text, res.statusText));
   }
   return text ? (JSON.parse(text) as TRes) : ({} as TRes);
+}
+
+function formatConnectError(body: string, fallback: string): string {
+  if (!body) return fallback;
+  try {
+    const parsed = JSON.parse(body) as { message?: string; code?: string };
+    if (parsed.message) return parsed.message;
+  } catch {
+    // not JSON
+  }
+  return body;
+}
+
+function encodeConnectJSONFrame(message: object): Uint8Array {
+  const payload = textEncoder.encode(JSON.stringify(message));
+  const out = new Uint8Array(5 + payload.length);
+  out[0] = 0; // flags: data frame
+  const len = payload.length;
+  out[1] = (len >>> 24) & 0xff;
+  out[2] = (len >>> 16) & 0xff;
+  out[3] = (len >>> 8) & 0xff;
+  out[4] = len & 0xff;
+  out.set(payload, 5);
+  return out;
+}
+
+type ConnectFrame = { flags: number; json: Record<string, unknown> };
+
+async function* readConnectJSONFrames(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): AsyncGenerator<ConnectFrame> {
+  let buffer = new Uint8Array(0);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value && value.length) {
+      const merged = new Uint8Array(buffer.length + value.length);
+      merged.set(buffer);
+      merged.set(value, buffer.length);
+      buffer = merged;
+    }
+    while (buffer.length >= 5) {
+      const flags = buffer[0];
+      const len = ((buffer[1] << 24) | (buffer[2] << 16) | (buffer[3] << 8) | buffer[4]) >>> 0;
+      if (buffer.length < 5 + len) break;
+      const slice = buffer.slice(5, 5 + len);
+      buffer = buffer.slice(5 + len);
+      const raw = textDecoder.decode(slice);
+      let json: Record<string, unknown> = {};
+      if (raw) {
+        try {
+          json = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          json = { raw };
+        }
+      }
+      yield { flags, json };
+      if (flags & 0x02) {
+        return;
+      }
+    }
+    if (done) return;
+  }
 }
 
 function mapSession(raw: Record<string, unknown>): Session {
@@ -94,9 +158,12 @@ export async function submitTask(
   return String(data.taskId ?? "");
 }
 
+export async function deleteSession(agentId: string): Promise<void> {
+  await connectUnary<{ agentId: string }, Record<string, never>>("DeleteSession", { agentId });
+}
+
 /**
- * Opens StreamEvents first, then runs submit() so the server subscription exists
- * before the task is queued.
+ * Opens StreamEvents first (Connect streaming content-type), then submits the task.
  */
 export async function submitTaskAndWait(
   agentId: string,
@@ -109,61 +176,46 @@ export async function submitTaskAndWait(
   const res = await fetch(`${servicePrefix}/StreamEvents`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/connect+json",
       "Connect-Protocol-Version": "1",
     },
-    body: JSON.stringify({ agentId }),
+    body: encodeConnectJSONFrame({ agentId }),
     signal,
   });
   if (!res.ok || !res.body) {
-    throw new Error((await res.text()) || res.statusText);
+    throw new Error(formatConnectError(await res.text(), res.statusText));
   }
 
   const taskId = await submitTask(agentId, name, args);
   onTaskId?.(taskId);
 
   const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      throw new Error("stream ended before task completed");
+  for await (const frame of readConnectJSONFrames(reader)) {
+    if (frame.flags & 0x02) {
+      const errMsg = frame.json.message;
+      if (typeof errMsg === "string" && errMsg) {
+        throw new Error(errMsg);
+      }
+      break;
     }
-    buffer += decoder.decode(value, { stream: true });
-
-    let idx: number;
-    while ((idx = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, idx).trim();
-      buffer = buffer.slice(idx + 1);
-      if (!line) continue;
-      let msg: Record<string, unknown>;
-      try {
-        msg = JSON.parse(line) as Record<string, unknown>;
-      } catch {
-        continue;
-      }
-      const result = msg.result as Record<string, unknown> | undefined;
-      const payload = (result ?? msg) as Record<string, unknown>;
-      const taskUpdated = (payload.taskUpdated ?? payload.task_updated) as
-        | Record<string, unknown>
-        | undefined;
-      if (!taskUpdated) continue;
-      const updated: TaskUpdated = {
-        taskId: String(taskUpdated.taskId ?? taskUpdated.task_id ?? ""),
-        agentId: String(taskUpdated.agentId ?? taskUpdated.agent_id ?? ""),
-        status: String(taskUpdated.status ?? ""),
-        stdout: String(taskUpdated.stdout ?? ""),
-        stderr: String(taskUpdated.stderr ?? ""),
-        exitCode: Number(taskUpdated.exitCode ?? taskUpdated.exit_code ?? 0),
-      };
-      if (updated.taskId !== taskId) continue;
-      onStatus?.(updated.status);
-      if (updated.status === "completed" || updated.status === "failed") {
-        await reader.cancel();
-        return updated;
-      }
+    const taskUpdated = (frame.json.taskUpdated ?? frame.json.task_updated) as
+      | Record<string, unknown>
+      | undefined;
+    if (!taskUpdated) continue;
+    const updated: TaskUpdated = {
+      taskId: String(taskUpdated.taskId ?? taskUpdated.task_id ?? ""),
+      agentId: String(taskUpdated.agentId ?? taskUpdated.agent_id ?? ""),
+      status: String(taskUpdated.status ?? ""),
+      stdout: String(taskUpdated.stdout ?? ""),
+      stderr: String(taskUpdated.stderr ?? ""),
+      exitCode: Number(taskUpdated.exitCode ?? taskUpdated.exit_code ?? 0),
+    };
+    if (updated.taskId !== taskId) continue;
+    onStatus?.(updated.status);
+    if (updated.status === "completed" || updated.status === "failed") {
+      await reader.cancel().catch(() => undefined);
+      return updated;
     }
   }
+  throw new Error("stream ended before task completed");
 }

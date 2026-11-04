@@ -28,6 +28,8 @@ Lab TLS certs are created under `data/certs/` on first start.
 go run ./agent/cmd/agent -server https://127.0.0.1:8443
 ```
 
+The agent persists its ID under the OS config dir (`%AppData%\lattice\agent.id` on Windows) so restarts reconnect as the same session. Override with `-id-file` or `LATTICE_AGENT_ID_FILE`.
+
 4. List sessions and task:
 
 ```text

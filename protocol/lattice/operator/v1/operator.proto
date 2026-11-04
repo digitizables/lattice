@@ -8,6 +8,7 @@ import "google/protobuf/timestamp.proto";
 
 service OperatorService {
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
   rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
   rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
 }
@@ -17,6 +18,12 @@ message ListSessionsRequest {}
 message ListSessionsResponse {
   repeated Session sessions = 1;
 }
+
+message DeleteSessionRequest {
+  string agent_id = 1;
+}
+
+message DeleteSessionResponse {}
 
 message Session {
   string agent_id = 1;
