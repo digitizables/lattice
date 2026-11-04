@@ -15,6 +15,7 @@ import (
 	"github.com/digitizables/lattice/server/api"
 	"github.com/digitizables/lattice/server/config"
 	"github.com/digitizables/lattice/server/core"
+	latticecrypto "github.com/digitizables/lattice/server/crypto"
 	"github.com/digitizables/lattice/server/extensions"
 	"github.com/digitizables/lattice/server/listen"
 	"github.com/digitizables/lattice/server/store"
@@ -43,6 +44,20 @@ func main() {
 	c := core.New(st)
 	mgr := listen.NewManager()
 
+	deps := extensions.ChannelDeps{Core: c, Log: log, Cleartext: cfg.AgentCleartext}
+	if !cfg.AgentCleartext {
+		certFile, keyFile, err := latticecrypto.EnsureLabAgentCert(cfg.CertDir)
+		if err != nil {
+			log.Error("tls certs", "err", err)
+			os.Exit(1)
+		}
+		deps.CertFile = certFile
+		deps.KeyFile = keyFile
+		log.Info("agent channel tls", "cert", certFile, "key", keyFile)
+	} else {
+		log.Warn("agent channel cleartext enabled", "env", "LATTICE_AGENT_CLEARTEXT")
+	}
+
 	loader := extensions.New(log)
 	extensions.RegisterBuiltins(loader)
 	manifests, err := loader.Discover(cfg.ExtensionsDir)
@@ -50,7 +65,7 @@ func main() {
 		log.Error("discover extensions", "err", err)
 		os.Exit(1)
 	}
-	if _, err := loader.StartChannels(ctx, mgr, extensions.ChannelDeps{Core: c, Log: log}, cfg.AgentAddr, manifests); err != nil {
+	if _, err := loader.StartChannels(ctx, mgr, deps, cfg.AgentAddr, manifests); err != nil {
 		log.Error("start channels", "err", err)
 		os.Exit(1)
 	}

@@ -14,16 +14,18 @@
 docker compose -f packager/docker/docker-compose.yml up -d postgres
 ```
 
-2. Start the teamserver (operator API on `:8080`, agent channel on `:8443`):
+2. Start the teamserver (operator API on `:8080`, HTTPS agent channel on `:8443`):
 
 ```text
 go run ./server/cmd/teamserver
 ```
 
+Lab TLS certs are created under `data/certs/` on first start.
+
 3. Start an agent:
 
 ```text
-go run ./agent/cmd/agent -server http://127.0.0.1:8443
+go run ./agent/cmd/agent -server https://127.0.0.1:8443
 ```
 
 4. List sessions and task:

@@ -25,3 +25,5 @@ Factories for extensions that ship with Lattice are registered in `server/extens
 ## Env
 
 - `LATTICE_EXTENSIONS_DIR` — root directory containing `channels/` (default `extensions`)
+- `LATTICE_CERT_DIR` — where lab agent-channel TLS certs are written (default `data/certs`)
+- `LATTICE_AGENT_CLEARTEXT=true` — disable TLS for the builtin HTTP channel (lab only)

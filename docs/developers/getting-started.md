@@ -8,7 +8,7 @@ Get one full path working before anything else: from the operator through the se
 - **Store** (`server/store`, goose + pgx): Done
 - **Core** (`server/core`): Done
 - **Config** (`server/config`): Done
-- **HTTP channel + listen manager**: Done (cleartext HTTP for lab; TLS helper present)
+- **HTTP channel + listen manager**: Done (TLS by default; lab certs under `data/certs`)
 - **Agent runtime / transport**: Done (`whoami`, `echo`, `hostname`)
 - **Connect API + CLI**: Done (`sessions`, `task` waits on `StreamEvents`)
 - **Extension loader**: Done (manifest discover + builtin channel factories; remote install still pending)
@@ -21,18 +21,22 @@ Get one full path working before anything else: from the operator through the se
 docker compose -f packager/docker/docker-compose.yml up -d postgres
 
 go run ./server/cmd/teamserver
-go run ./agent/cmd/agent -server http://127.0.0.1:8443
+go run ./agent/cmd/agent -server https://127.0.0.1:8443
 go run ./client/cmd/client sessions
 go run ./client/cmd/client task <agent_id> whoami
 ```
+
+The agent defaults to `-insecure` so lab self-signed certs work. Set `-insecure=false` when using a real certificate.
 
 Env defaults:
 
 - `LATTICE_DATABASE_URL` = `postgres://lattice:lattice@127.0.0.1:5432/lattice?sslmode=disable`
 - `LATTICE_HTTP_ADDR` = `:8080` (Connect operator API)
-- `LATTICE_AGENT_ADDR` = `:8443` (HTTP channel)
+- `LATTICE_AGENT_ADDR` = `:8443` (HTTPS agent channel)
 - `LATTICE_API_URL` = `http://127.0.0.1:8080` (CLI)
 - `LATTICE_EXTENSIONS_DIR` = `extensions`
+- `LATTICE_CERT_DIR` = `data/certs`
+- `LATTICE_AGENT_CLEARTEXT` = `false` (set `true` only to force plain HTTP)
 
 Regenerate stubs after proto edits:
 

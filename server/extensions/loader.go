@@ -16,8 +16,11 @@ type ChannelFactory func(deps ChannelDeps) (listen.Channel, error)
 
 // ChannelDeps is what in-process channel extensions receive today.
 type ChannelDeps struct {
-	Core *core.Core
-	Log  *slog.Logger
+	Core      *core.Core
+	Log       *slog.Logger
+	CertFile  string
+	KeyFile   string
+	Cleartext bool // when true, skip TLS (lab escape hatch)
 }
 
 // Loader discovers manifests and constructs registered extension factories.

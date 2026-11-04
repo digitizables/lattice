@@ -18,12 +18,15 @@ import (
 
 // Channel serves agent check-in and task-result over HTTP(S) with Protobuf bodies.
 type Channel struct {
-	core   *core.Core
-	log    *slog.Logger
-	server *http.Server
+	core     *core.Core
+	log      *slog.Logger
+	server   *http.Server
+	certFile string
+	keyFile  string
+	useTLS   bool
 }
 
-// New builds an HTTP channel bound to core.
+// New builds an HTTP channel bound to core (TLS configured via WithTLS).
 func New(c *core.Core, log *slog.Logger) *Channel {
 	if log == nil {
 		log = slog.Default()
@@ -31,10 +34,18 @@ func New(c *core.Core, log *slog.Logger) *Channel {
 	return &Channel{core: c, log: log}
 }
 
+// WithTLS enables ListenAndServeTLS using the given certificate files.
+func (c *Channel) WithTLS(certFile, keyFile string) *Channel {
+	c.certFile = certFile
+	c.keyFile = keyFile
+	c.useTLS = true
+	return c
+}
+
 // Name identifies the channel to the listener manager.
 func (c *Channel) Name() string { return "http" }
 
-// Start listens on addr. Use http:// for lab cleartext or configure TLS later.
+// Start listens on addr. Uses TLS when WithTLS was called.
 func (c *Channel) Start(ctx context.Context, addr string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/checkin", c.handleCheckIn)
@@ -46,44 +57,27 @@ func (c *Channel) Start(ctx context.Context, addr string) error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	go func() {
-		c.log.Info("http channel listening", "addr", addr)
-		err := c.server.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			c.log.Error("http channel stopped", "err", err)
+	if c.useTLS {
+		if c.certFile == "" || c.keyFile == "" {
+			return fmt.Errorf("tls enabled but cert/key paths are empty")
 		}
-	}()
-
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = c.Stop(shutdownCtx)
-	}()
-
-	return nil
-}
-
-// StartTLS is like Start but with a certificate.
-func (c *Channel) StartTLS(ctx context.Context, addr, certFile, keyFile string) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/checkin", c.handleCheckIn)
-	mux.HandleFunc("POST /v1/result", c.handleResult)
-
-	c.server = &http.Server{
-		Addr:              addr,
-		Handler:           mux,
-		ReadHeaderTimeout: 10 * time.Second,
-		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12},
+		c.server.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		go func() {
+			c.log.Info("http channel listening", "addr", addr, "tls", true)
+			err := c.server.ListenAndServeTLS(c.certFile, c.keyFile)
+			if err != nil && err != http.ErrServerClosed {
+				c.log.Error("http channel stopped", "err", err)
+			}
+		}()
+	} else {
+		go func() {
+			c.log.Info("http channel listening", "addr", addr, "tls", false)
+			err := c.server.ListenAndServe()
+			if err != nil && err != http.ErrServerClosed {
+				c.log.Error("http channel stopped", "err", err)
+			}
+		}()
 	}
-
-	go func() {
-		c.log.Info("http channel listening tls", "addr", addr)
-		err := c.server.ListenAndServeTLS(certFile, keyFile)
-		if err != nil && err != http.ErrServerClosed {
-			c.log.Error("http channel stopped", "err", err)
-		}
-	}()
 
 	go func() {
 		<-ctx.Done()
@@ -159,8 +153,4 @@ func (c *Channel) handleResult(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(raw)
 }
 
-// Ensure Channel implements listen.Channel.
 var _ listen.Channel = (*Channel)(nil)
-
-// ErrNotConfigured is reserved for profile-driven startup failures.
-var ErrNotConfigured = fmt.Errorf("http channel not configured")

@@ -3,6 +3,7 @@ package transport
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,11 +20,24 @@ type HTTP struct {
 	client  *http.Client
 }
 
-// NewHTTP builds a transport pointed at baseURL, e.g. http://127.0.0.1:8443.
-func NewHTTP(baseURL string) *HTTP {
+// Options configures the agent HTTP(S) transport.
+type Options struct {
+	// InsecureSkipVerify skips TLS certificate verification (lab self-signed certs).
+	InsecureSkipVerify bool
+}
+
+// NewHTTP builds a transport pointed at baseURL, e.g. https://127.0.0.1:8443.
+func NewHTTP(baseURL string, opts Options) *HTTP {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if opts.InsecureSkipVerify {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // lab default for self-signed agent certs
+	}
 	return &HTTP{
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: transport,
+		},
 	}
 }
 
