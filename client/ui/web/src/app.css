@@ -279,7 +279,7 @@ button {
 
 .heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--page-pad-y) var(--page-pad-x);
@@ -290,6 +290,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 
 .search {
@@ -300,6 +301,7 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0 var(--space-3);
+  line-height: var(--control-h);
 }
 
 .search:focus {
