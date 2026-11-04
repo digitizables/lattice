@@ -73,6 +73,19 @@ func (m *Manager) Stop(ctx context.Context, name string) error {
 	return ch.Stop(ctx)
 }
 
+// StopAll stops every running channel.
+func (m *Manager) StopAll(ctx context.Context) {
+	m.mu.Lock()
+	names := make([]string, 0, len(m.running))
+	for name := range m.running {
+		names = append(names, name)
+	}
+	m.mu.Unlock()
+	for _, name := range names {
+		_ = m.Stop(ctx, name)
+	}
+}
+
 // HandlerFunc adapts a function to http.Handler.
 type HandlerFunc func(http.ResponseWriter, *http.Request)
 

@@ -12,10 +12,10 @@ import (
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
 
-	httpchannel "github.com/digitizables/lattice/extensions/channels/http"
 	"github.com/digitizables/lattice/server/api"
 	"github.com/digitizables/lattice/server/config"
 	"github.com/digitizables/lattice/server/core"
+	"github.com/digitizables/lattice/server/extensions"
 	"github.com/digitizables/lattice/server/listen"
 	"github.com/digitizables/lattice/server/store"
 )
@@ -42,10 +42,16 @@ func main() {
 
 	c := core.New(st)
 	mgr := listen.NewManager()
-	ch := httpchannel.New(c, log)
-	mgr.Register(ch)
-	if err := mgr.Start(ctx, "http", cfg.AgentAddr); err != nil {
-		log.Error("start http channel", "err", err)
+
+	loader := extensions.New(log)
+	extensions.RegisterBuiltins(loader)
+	manifests, err := loader.Discover(cfg.ExtensionsDir)
+	if err != nil {
+		log.Error("discover extensions", "err", err)
+		os.Exit(1)
+	}
+	if _, err := loader.StartChannels(ctx, mgr, extensions.ChannelDeps{Core: c, Log: log}, cfg.AgentAddr, manifests); err != nil {
+		log.Error("start channels", "err", err)
 		os.Exit(1)
 	}
 
@@ -83,5 +89,5 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
-	_ = mgr.Stop(shutdownCtx, "http")
+	mgr.StopAll(shutdownCtx)
 }

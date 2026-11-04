@@ -11,7 +11,7 @@ Get one full path working before anything else: from the operator through the se
 - **HTTP channel + listen manager**: Done (cleartext HTTP for lab; TLS helper present)
 - **Agent runtime / transport**: Done (`whoami`, `echo`, `hostname`)
 - **Connect API + CLI**: Done (`sessions`, `task` waits on `StreamEvents`)
-- **Extension loader / remote install**: Pending
+- **Extension loader**: Done (manifest discover + builtin channel factories; remote install still pending)
 - **Web UI**: Pending
 - **Compose teamserver/web images**: Scaffold only
 
@@ -32,6 +32,7 @@ Env defaults:
 - `LATTICE_HTTP_ADDR` = `:8080` (Connect operator API)
 - `LATTICE_AGENT_ADDR` = `:8443` (HTTP channel)
 - `LATTICE_API_URL` = `http://127.0.0.1:8080` (CLI)
+- `LATTICE_EXTENSIONS_DIR` = `extensions`
 
 Regenerate stubs after proto edits:
 
@@ -78,7 +79,7 @@ go mod tidy
 6. **`server/api`** - done (`StreamEvents` live)
 7. **`client` CLI** - done for sessions/task (waits for completion)
 8. **`packager/docker`** - Postgres service ready; images wait on polished release flow
-9. **Extension loader** - next
+9. **Extension loader** - done for in-process channels; remote install later
 10. **Web UI** - after API stabilizes
 
 ## Checklist
@@ -87,7 +88,8 @@ go mod tidy
 - [x] Compose `postgres` healthy; teamserver/agent/client lab path works locally
 - [x] Binaries build (`teamserver`, `agent`, `client`)
 - [x] End-to-end check-in + task against live Postgres (`whoami` / `echo` completed in DB)
-- [ ] HTTP channel loads through a generic extension loader (currently registered in `teamserver` main)
+- [x] HTTP channel loads through the extension loader from `extensions/channels/http/manifest.yaml`
+- [ ] Remote extension install from GitHub or a local package
 - [ ] Compose `teamserver` / `web` images build and run
 
 
