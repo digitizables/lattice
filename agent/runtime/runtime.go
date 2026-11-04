@@ -12,6 +12,7 @@ import (
 	"github.com/digitizables/lattice/agent/identity"
 	"github.com/digitizables/lattice/agent/transport"
 	agentv1 "github.com/digitizables/lattice/gen/lattice/agent/v1"
+	"github.com/digitizables/lattice/internal/version"
 )
 
 // Agent is the reference implant loop.
@@ -67,9 +68,13 @@ func (a *Agent) beat(ctx context.Context) error {
 		Arch:         runtime.GOARCH,
 		SleepSeconds: uint64(a.Sleep / time.Second),
 		Cwd:          a.Cwd,
+		Version:      version.Version,
 	})
 	if err != nil {
 		return err
+	}
+	if upd := resp.GetUpdate(); upd != nil && a.Log != nil {
+		a.Log.Info("update available", "current", version.Version, "latest", upd.GetVersion())
 	}
 	if id := resp.GetAgentId(); id != "" {
 		changed := id != a.ID

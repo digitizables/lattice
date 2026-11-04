@@ -95,7 +95,7 @@ func (h *HTTP) post(ctx context.Context, path string, in, out proto.Message) err
 		return err
 	}
 	defer res.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
 	if err != nil {
 		return err
 	}

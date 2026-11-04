@@ -19,12 +19,17 @@ message AgentCheckIn {
 
   // Current working directory on the host (shell commands run here).
   string cwd = 7;
+
+  // Agent build version (semver-ish), used by the update service.
+  string version = 8;
 }
 
 // Server -> agent after check-in.
 message AgentCheckInResponse {
   string agent_id = 1;
   repeated Task tasks = 2;
+  // Set when a newer agent build is published for this os/arch.
+  UpdateInfo update = 3;
 }
 
 message Task {
@@ -69,4 +74,38 @@ message AgentTaskCancelPoll {
 
 message AgentTaskCancelPollResponse {
   bool cancelled = 1;
+}
+
+message UpdateInfo {
+  string version = 1;
+  string os = 2;
+  string arch = 3;
+  string sha256 = 4;
+  uint64 size = 5;
+}
+
+// Agent -> server: ask whether an update exists for this platform.
+message AgentUpdateCheck {
+  string agent_id = 1;
+  string os = 2;
+  string arch = 3;
+  string current_version = 4;
+}
+
+message AgentUpdateCheckResponse {
+  bool available = 1;
+  UpdateInfo update = 2;
+}
+
+// Agent -> server: download the published binary for os/arch.
+message AgentUpdateDownload {
+  string agent_id = 1;
+  string os = 2;
+  string arch = 3;
+  string version = 4; // empty = latest published for platform
+}
+
+message AgentUpdateDownloadResponse {
+  UpdateInfo update = 1;
+  bytes data = 2;
 }

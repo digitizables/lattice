@@ -8,17 +8,19 @@ import (
 
 	agentv1 "github.com/digitizables/lattice/gen/lattice/agent/v1"
 	"github.com/digitizables/lattice/server/store"
+	"github.com/digitizables/lattice/server/updates"
 )
 
 // Core is the teamserver domain logic on top of the store.
 type Core struct {
-	store *store.Store
-	bus   *Bus
+	store   *store.Store
+	bus     *Bus
+	updates *updates.Store
 }
 
-// New wraps a store.
-func New(s *store.Store) *Core {
-	return &Core{store: s, bus: newBus()}
+// New wraps a store and optional update catalog.
+func New(s *store.Store, u *updates.Store) *Core {
+	return &Core{store: s, bus: newBus(), updates: u}
 }
 
 // SubscribeEvents returns a live event feed for operators.
@@ -75,7 +77,68 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 			Args:   t.Args,
 		})
 	}
+	if info, ok := c.UpdateHint(in.GetOs(), in.GetArch(), in.GetVersion()); ok {
+		out.Update = info
+	}
 	return out, nil
+}
+
+// UpdateHint returns update metadata when a newer build is published.
+func (c *Core) UpdateHint(osName, arch, current string) (*agentv1.UpdateInfo, bool) {
+	if c.updates == nil {
+		return nil, false
+	}
+	art, ok, err := c.updates.Latest(osName, arch)
+	if err != nil || !ok || !updates.NewerThan(art.Version, current) {
+		return nil, false
+	}
+	return &agentv1.UpdateInfo{
+		Version: art.Version,
+		Os:      art.OS,
+		Arch:    art.Arch,
+		Sha256:  art.SHA256,
+		Size:    art.Size,
+	}, true
+}
+
+// CheckUpdate is the agent update-check RPC.
+func (c *Core) CheckUpdate(osName, arch, current string) (bool, *agentv1.UpdateInfo, error) {
+	info, ok := c.UpdateHint(osName, arch, current)
+	return ok, info, nil
+}
+
+// DownloadUpdate returns published binary bytes for the agent.
+func (c *Core) DownloadUpdate(osName, arch, version string) (*agentv1.UpdateInfo, []byte, error) {
+	if c.updates == nil {
+		return nil, nil, fmt.Errorf("update service not configured")
+	}
+	art, data, err := c.updates.Get(osName, arch, version)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &agentv1.UpdateInfo{
+		Version: art.Version,
+		Os:      art.OS,
+		Arch:    art.Arch,
+		Sha256:  art.SHA256,
+		Size:    art.Size,
+	}, data, nil
+}
+
+// PublishUpdate stores an operator-uploaded agent build.
+func (c *Core) PublishUpdate(version, osName, arch string, data []byte) (updates.Artifact, error) {
+	if c.updates == nil {
+		return updates.Artifact{}, fmt.Errorf("update service not configured")
+	}
+	return c.updates.Publish(version, osName, arch, data)
+}
+
+// ListUpdates returns published agent builds.
+func (c *Core) ListUpdates() ([]updates.Artifact, error) {
+	if c.updates == nil {
+		return nil, nil
+	}
+	return c.updates.List()
 }
 
 // HandleTaskResult records an agent task result.

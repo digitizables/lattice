@@ -52,6 +52,8 @@ func (c *Channel) Start(ctx context.Context, addr string) error {
 	mux.HandleFunc("POST /v1/result", c.handleResult)
 	mux.HandleFunc("POST /v1/task_running", c.handleTaskRunning)
 	mux.HandleFunc("POST /v1/task_cancel_poll", c.handleTaskCancelPoll)
+	mux.HandleFunc("POST /v1/update/check", c.handleUpdateCheck)
+	mux.HandleFunc("POST /v1/update/download", c.handleUpdateDownload)
 
 	c.server = &http.Server{
 		Addr:              addr,
@@ -173,6 +175,64 @@ func (c *Channel) handleTaskRunning(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	raw, err := proto.Marshal(&agentv1.AgentTaskRunningResponse{Ok: true, Cancelled: cancelled})
+	if err != nil {
+		http.Error(w, "marshal", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(raw)
+}
+
+func (c *Channel) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var in agentv1.AgentUpdateCheck
+	if err := proto.Unmarshal(body, &in); err != nil {
+		http.Error(w, "bad protobuf", http.StatusBadRequest)
+		return
+	}
+	ok, info, err := c.core.CheckUpdate(in.GetOs(), in.GetArch(), in.GetCurrentVersion())
+	if err != nil {
+		http.Error(w, "update check failed", http.StatusInternalServerError)
+		return
+	}
+	out := &agentv1.AgentUpdateCheckResponse{Available: ok, Update: info}
+	raw, err := proto.Marshal(out)
+	if err != nil {
+		http.Error(w, "marshal", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(raw)
+}
+
+func (c *Channel) handleUpdateDownload(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var in agentv1.AgentUpdateDownload
+	if err := proto.Unmarshal(body, &in); err != nil {
+		http.Error(w, "bad protobuf", http.StatusBadRequest)
+		return
+	}
+	info, data, err := c.core.DownloadUpdate(in.GetOs(), in.GetArch(), in.GetVersion())
+	if err != nil {
+		c.log.Error("update download failed", "err", err)
+		http.Error(w, "update download failed", http.StatusNotFound)
+		return
+	}
+	// Cap absurd uploads in memory responses (lab binaries should be small).
+	if len(data) > 64<<20 {
+		http.Error(w, "update too large", http.StatusBadRequest)
+		return
+	}
+	out := &agentv1.AgentUpdateDownloadResponse{Update: info, Data: data}
+	raw, err := proto.Marshal(out)
 	if err != nil {
 		http.Error(w, "marshal", http.StatusInternalServerError)
 		return

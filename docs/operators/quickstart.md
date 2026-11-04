@@ -100,6 +100,23 @@ Or task the agent: `cleanup` (also `uninstall-all` / `burn`). This stops/removes
 
 Service name / paths are overridable with `LATTICE_SERVICE_NAME`, `LATTICE_INSTALL_DIR`, and `LATTICE_CONFIG_DIR` for less obvious lab/opsec footprints.
 
+### Agent updates
+
+Publish a new agent build to the teamserver catalog:
+
+```text
+go build -o bin/agent.exe ./agent/cmd/agent
+go run ./server/cmd/publish-agent -version 0.2.0 -file ./bin/agent.exe -os windows -arch amd64
+```
+
+Then task live agents:
+
+```text
+update
+```
+
+The agent checks `/v1/update/check`, downloads `/v1/update/download`, verifies SHA-256, replaces its binary, and restarts. Check-ins also advertise when a newer build is available.
+
 **Settings** (gear in the sidebar) → **Terminal** controls full vs partial path in the prompt.
 
 Agent output is capped at 256KiB.

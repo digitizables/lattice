@@ -163,6 +163,8 @@ func (a *Agent) runTask(ctx context.Context, t *agentv1.Task) (exitCode int32, s
 		return a.runPersist()
 	case "cleanup", "uninstall-all", "burn":
 		return a.runCleanup()
+	case "update":
+		return a.runUpdate(ctx)
 	default:
 		return a.runShell(ctx, taskID, "default", commandLine(t.GetName(), args))
 	}

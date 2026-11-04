@@ -20,6 +20,7 @@ import (
 	"github.com/digitizables/lattice/server/httpx"
 	"github.com/digitizables/lattice/server/listen"
 	"github.com/digitizables/lattice/server/store"
+	"github.com/digitizables/lattice/server/updates"
 )
 
 func main() {
@@ -42,7 +43,14 @@ func main() {
 	}
 	defer st.Close()
 
-	c := core.New(st)
+	up, err := updates.New(cfg.UpdatesDir)
+	if err != nil {
+		log.Error("updates", "err", err)
+		os.Exit(1)
+	}
+	log.Info("update catalog", "dir", cfg.UpdatesDir)
+
+	c := core.New(st, up)
 	mgr := listen.NewManager()
 
 	deps := extensions.ChannelDeps{Core: c, Log: log, Cleartext: cfg.AgentCleartext}

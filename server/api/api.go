@@ -105,6 +105,48 @@ func (s *Server) CancelTask(
 	return &operatorv1.CancelTaskResponse{Cancelled: ok}, nil
 }
 
+func (s *Server) ListAgentUpdates(
+	_ context.Context,
+	_ *operatorv1.ListAgentUpdatesRequest,
+) (*operatorv1.ListAgentUpdatesResponse, error) {
+	list, err := s.core.ListUpdates()
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err.Error())
+	}
+	out := &operatorv1.ListAgentUpdatesResponse{}
+	for _, a := range list {
+		out.Updates = append(out.Updates, &operatorv1.AgentUpdate{
+			Version:     a.Version,
+			Os:          a.OS,
+			Arch:        a.Arch,
+			Sha256:      a.SHA256,
+			Size:        a.Size,
+			PublishedAt: timestamppb.New(a.PublishedAt),
+		})
+	}
+	return out, nil
+}
+
+func (s *Server) PublishAgentUpdate(
+	_ context.Context,
+	req *operatorv1.PublishAgentUpdateRequest,
+) (*operatorv1.PublishAgentUpdateResponse, error) {
+	art, err := s.core.PublishUpdate(req.GetVersion(), req.GetOs(), req.GetArch(), req.GetData())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err.Error())
+	}
+	return &operatorv1.PublishAgentUpdateResponse{
+		Update: &operatorv1.AgentUpdate{
+			Version:     art.Version,
+			Os:          art.OS,
+			Arch:        art.Arch,
+			Sha256:      art.SHA256,
+			Size:        art.Size,
+			PublishedAt: timestamppb.New(art.PublishedAt),
+		},
+	}, nil
+}
+
 func storeTaskToUpdated(task store.Task) *operatorv1.TaskUpdated {
 	var exit int32
 	if task.ExitCode != nil {
