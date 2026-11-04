@@ -38,9 +38,20 @@ go run ./client/cmd/client task <agent_id> whoami
 go run ./client/cmd/client task <agent_id> echo hello
 ```
 
-Builtins today: `whoami`, `echo`, `hostname`.
+Builtins: `whoami`, `echo`, `hostname`.
 
-`client task` prints the task id, then waits on `StreamEvents` until the agent finishes (status lines, then stdout/stderr).
+Shell tasking (60s timeout):
+
+```text
+go run ./client/cmd/client task <agent_id> dir
+go run ./client/cmd/client task <agent_id> shell "ipconfig /all"
+go run ./client/cmd/client task <agent_id> powershell "Get-Process | Select -First 5"
+go run ./client/cmd/client task <agent_id> ls -la
+```
+
+On Windows, bare commands and `shell`/`cmd` use `cmd.exe`; `powershell`/`pwsh` use PowerShell. On Unix, bare commands and `shell` use `$SHELL` (fallback `/bin/sh`); `bash` is available when installed.
+
+`client task` prints the task id, then waits until the agent finishes (status lines, then stdout/stderr).
 
 ## Web UI
 
@@ -56,7 +67,7 @@ Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:80
 
 The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a listeners status view.
 
-Open a session in **Console**, then type commands and press Enter (`whoami`, `echo hi`, `hostname`). Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears.
+Open a session in **Console**, then type commands and press Enter. Examples: `whoami`, `dir`, `powershell Get-Date`, `shell ipconfig`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears.
 
 The agent process must be running while you task. If the console stays on a queued status, start:
 

@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/user"
@@ -78,7 +77,7 @@ func (a *Agent) beat(ctx context.Context) error {
 	a.Log.Info("check-in ok", "agent_id", a.ID, "tasks", len(resp.GetTasks()))
 
 	for _, t := range resp.GetTasks() {
-		exitCode, stdout, stderr := runTask(t)
+		exitCode, stdout, stderr := runTask(ctx, t)
 		_, err := a.Transport.PostResult(ctx, &agentv1.AgentTaskResult{
 			AgentId:  a.ID,
 			TaskId:   t.GetTaskId(),
@@ -91,27 +90,6 @@ func (a *Agent) beat(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func runTask(t *agentv1.Task) (exitCode int32, stdout, stderr string) {
-	switch strings.ToLower(t.GetName()) {
-	case "whoami":
-		u, err := user.Current()
-		if err != nil {
-			return 1, "", err.Error()
-		}
-		return 0, u.Username, ""
-	case "echo":
-		return 0, strings.Join(t.GetArgs(), " "), ""
-	case "hostname":
-		h, err := os.Hostname()
-		if err != nil {
-			return 1, "", err.Error()
-		}
-		return 0, h, ""
-	default:
-		return 1, "", fmt.Sprintf("unknown command %q", t.GetName())
-	}
 }
 
 // accountName strips HOST\ from Windows usernames when HOST matches the hostname.
