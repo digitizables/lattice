@@ -30,6 +30,7 @@
     onPickerSearch = undefined as undefined | (() => void),
     onAgentChange = undefined as undefined | ((id: string) => void),
     onSessionUpdated = undefined as undefined | ((s: Session) => void),
+    onContextMenu = undefined as undefined | ((x: number, y: number) => void),
   }: {
     agentId?: string;
     pathDisplay: PathDisplay;
@@ -44,6 +45,7 @@
     onPickerSearch?: () => void;
     onAgentChange?: (id: string) => void;
     onSessionUpdated?: (s: Session) => void;
+    onContextMenu?: (x: number, y: number) => void;
   } = $props();
 
   let lines = $state<string[]>([]);
@@ -236,6 +238,12 @@
   role="group"
   aria-label={title}
   onclick={() => onFocus?.()}
+  oncontextmenu={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onFocus?.();
+    onContextMenu?.(e.clientX, e.clientY);
+  }}
 >
   <div class="term-pane-bar">
     <div class="term-pane-title">{title}</div>

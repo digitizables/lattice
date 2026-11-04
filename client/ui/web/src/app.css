@@ -657,6 +657,51 @@ table.sessions tr.selected {
   background: #0f0f0f;
 }
 
+.term-ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: #1a1a1a;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 2px;
+  animation: fade-in 120ms ease-out;
+}
+
+.term-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.term-ctx-item:hover,
+.term-ctx-item:focus-visible {
+  background: #262626;
+  outline: none;
+}
+
+.term-ctx-item.danger {
+  color: var(--danger);
+}
+
+.term-ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-soft);
+}
+
 .term-pane.active {
   border-color: #2a2a2a;
 }

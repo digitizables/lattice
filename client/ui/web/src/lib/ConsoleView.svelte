@@ -25,6 +25,7 @@
   let pickerSessions = $state<Session[]>([]);
   let pickerQueryByPane = $state<Record<string, string>>({ [first.pane.id]: "" });
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let ctxMenu = $state<{ x: number; y: number; paneId: string } | null>(null);
 
   const activeTab = $derived(tabs.find((t) => t.id === activeTabId) ?? tabs[0]);
   const activePanes = $derived(
@@ -32,6 +33,55 @@
       .map((id) => panes[id])
       .filter((p): p is TermPane => Boolean(p)),
   );
+
+  function openCtxMenu(paneId: string, x: number, y: number) {
+    focusPane(activeTabId, paneId);
+    // Keep the menu inside the viewport.
+    const pad = 8;
+    const menuW = 200;
+    const menuH = 140;
+    const left = Math.min(x, window.innerWidth - menuW - pad);
+    const top = Math.min(y, window.innerHeight - menuH - pad);
+    ctxMenu = { x: Math.max(pad, left), y: Math.max(pad, top), paneId };
+  }
+
+  function closeCtxMenu() {
+    ctxMenu = null;
+  }
+
+  function ctxSplit(mode: Exclude<SplitMode, "none">) {
+    if (ctxMenu) focusPane(activeTabId, ctxMenu.paneId);
+    splitActive(mode);
+    closeCtxMenu();
+  }
+
+  function ctxClosePane() {
+    if (!ctxMenu || !activeTab) return;
+    closePane(activeTab.id, ctxMenu.paneId);
+    closeCtxMenu();
+  }
+
+  $effect(() => {
+    if (!ctxMenu) return;
+    const onPointer = (e: PointerEvent) => {
+      const t = e.target;
+      if (t instanceof Element && t.closest(".term-ctx-menu")) return;
+      closeCtxMenu();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeCtxMenu();
+    };
+    // Defer so the opening right-click does not immediately dismiss.
+    const t = window.setTimeout(() => {
+      window.addEventListener("pointerdown", onPointer, true);
+      window.addEventListener("keydown", onKey, true);
+    }, 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("pointerdown", onPointer, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  });
 
   function sessionLabel(agentId: string): string | undefined {
     if (!agentId) return undefined;
@@ -213,7 +263,14 @@
   });
 </script>
 
-<div class="surface console-surface">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="surface console-surface"
+  oncontextmenu={(e) => {
+    // Block the browser inspect menu anywhere in the console.
+    e.preventDefault();
+  }}
+>
   <div class="term-tabbar">
     <div class="term-tabs" role="tablist" aria-label="Terminal tabs">
       {#each tabs as tab, i (tab.id)}
@@ -295,8 +352,40 @@
           onPickerSearch={() => schedulePickerSearch(pane.id)}
           onAgentChange={(id) => setPaneAgent(pane.id, id)}
           onSessionUpdated={onSessionUpdated}
+          onContextMenu={(x, y) => openCtxMenu(pane.id, x, y)}
         />
       {/each}
+    </div>
+  {/if}
+
+  {#if ctxMenu}
+    <div
+      class="term-ctx-menu"
+      style="left: {ctxMenu.x}px; top: {ctxMenu.y}px"
+      role="menu"
+      aria-label="Terminal"
+    >
+      <button type="button" class="term-ctx-item" role="menuitem" onclick={() => ctxSplit("vertical")}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          ><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M12 3v18" /></svg
+        >
+        Split right
+      </button>
+      <button type="button" class="term-ctx-item" role="menuitem" onclick={() => ctxSplit("horizontal")}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          ><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 12h18" /></svg
+        >
+        Split down
+      </button>
+      {#if activePanes.length > 1}
+        <div class="term-ctx-sep" role="separator"></div>
+        <button type="button" class="term-ctx-item danger" role="menuitem" onclick={() => ctxClosePane()}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            ><path d="M18 6 6 18M6 6l12 12" /></svg
+          >
+          Close pane
+        </button>
+      {/if}
     </div>
   {/if}
 </div>
