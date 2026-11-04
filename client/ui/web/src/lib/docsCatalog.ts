@@ -37,7 +37,7 @@ export const docSets: DocSet[] = [
       {
         id: "operators/persistence",
         title: "Persistence",
-        description: "Service, logon-task, startup persistence, and full cleanup on targets.",
+        description: "Service, logon-task, and startup persistence; uninstall and cleanup scope.",
         file: "persistence.md",
         markdown: operatorsPersistence,
       },

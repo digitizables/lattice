@@ -55,7 +55,7 @@ func main() {
 			log.Error("uninstall failed", "err", err)
 			os.Exit(1)
 		}
-		fmt.Printf("removed persistence registration for %q (use cleanup to wipe files)\n", install.ServiceName())
+		fmt.Printf("removed persistence registration for %q (use cleanup to delete install files)\n", install.ServiceName())
 		return
 	case "cleanup":
 		res, err := install.Cleanup()

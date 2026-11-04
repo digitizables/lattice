@@ -75,7 +75,7 @@ Command input is highlighted with **highlight.js** (bash / PowerShell / DOS). Ag
 
 Long-running commands (`ping`, `tail -f`, …) stream live output into the console. **Ctrl+C** cancels the task on the teamserver; the agent stops the process tree (and sends Ctrl+C on a PTY) and returns whatever output was captured.
 
-Persistence methods (OS **service**, **logon-task**, **startup** entry) and full **cleanup** are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
+Persistence (**service** / **logon-task** / **startup**) and teardown (**uninstall** / **cleanup**) are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
 
 ### Lab vs target persistence
 
@@ -84,13 +84,13 @@ The **command-center host is never a session**. Check-ins whose hostname matches
 - **Lab:** keep the Docker lab agent up with `docker compose -f packager/docker/docker-compose.lab.yml up -d` (`restart: unless-stopped`).
 - **Real targets:** from a live remote session run `persist`, or run `agent install` on that target only. Methods are **service** / **logon-task** / **startup** (see [persistence.md](persistence.md)).
 
-Remove persistence registration on a target:
+Remove persistence registration on a target (leaves files unless you also clean up):
 
 ```text
 .\bin\agent.exe uninstall
 ```
 
-### Remove all traces from a target
+### Tear down Lattice artifacts on a target
 
 From an elevated shell on the **target** (never the command center):
 
@@ -98,9 +98,9 @@ From an elevated shell on the **target** (never the command center):
 .\bin\agent.exe cleanup
 ```
 
-Or task the agent: `cleanup` (also `uninstall-all` / `burn`). This stops/removes the service, deletes the install dir and config/`agent.id`, schedules deletion of the running binary, then exits.
+Or task the agent: `cleanup` (also `uninstall-all` / `burn`). This unregisters persistence Lattice created, deletes the install directory and config/`agent.id` when it can, schedules deletion of the running binary, then exits. It is a best-effort uninstall of Lattice-managed artifacts, not a forensic wipe of the host.
 
-Service name / paths are overridable with `LATTICE_SERVICE_NAME`, `LATTICE_INSTALL_DIR`, and `LATTICE_CONFIG_DIR` for less obvious lab/opsec footprints.
+Override service name and paths with `LATTICE_SERVICE_NAME`, `LATTICE_INSTALL_DIR`, and `LATTICE_CONFIG_DIR` when you want distinct lab identifiers.
 
 ### Agent updates
 
