@@ -28,7 +28,7 @@ Lab TLS certs are created under `data/certs/` on first start.
 docker compose -f packager/docker/docker-compose.lab.yml up -d --build
 ```
 
-The command-center machine is refused as a session by default (`LATTICE_ALLOW_LOCAL_AGENTS=false`). Lab persistence is the Compose `restart: unless-stopped` policy plus a volume for `agent.id` so recreating the container reuses the same session (see [persistence.md](persistence.md) for Keel/Harbor/Splice on real targets). The teamserver also keeps one session per hostname: a live check-in removes stale duplicates with the same hostname.
+The command-center machine is refused as a session by default (`LATTICE_ALLOW_LOCAL_AGENTS=false`). Lab persistence is the Compose `restart: unless-stopped` policy plus a volume for `agent.id` so recreating the container reuses the same session (see [persistence.md](persistence.md) for service / logon-task / startup on real targets). The teamserver also keeps one session per hostname: a live check-in removes stale duplicates with the same hostname.
 
 4. List sessions and task:
 
@@ -75,14 +75,14 @@ Command input is highlighted with **highlight.js** (bash / PowerShell / DOS). Ag
 
 Long-running commands (`ping`, `tail -f`, …) stream live output into the console. **Ctrl+C** cancels the task on the teamserver; the agent stops the process tree (and sends Ctrl+C on a PTY) and returns whatever output was captured.
 
-Persistence method codenames (**Keel**, **Harbor**, **Splice**) and full wipe (**Ash**) are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
+Persistence methods (OS **service**, **logon-task**, **startup** entry) and full **cleanup** are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
 
 ### Lab vs target persistence
 
 The **command-center host is never a session**. Check-ins whose hostname matches the teamserver are rejected (`LATTICE_ALLOW_LOCAL_AGENTS=false` by default), and leftover matching rows are purged on teamserver start.
 
 - **Lab:** keep the Docker lab agent up with `docker compose -f packager/docker/docker-compose.lab.yml up -d` (`restart: unless-stopped`).
-- **Real targets:** from a live remote session run `persist`, or run `agent install` on that target only. Methods are **Keel** / **Harbor** / **Splice** (see [persistence.md](persistence.md)).
+- **Real targets:** from a live remote session run `persist`, or run `agent install` on that target only. Methods are **service** / **logon-task** / **startup** (see [persistence.md](persistence.md)).
 
 Remove persistence registration on a target:
 

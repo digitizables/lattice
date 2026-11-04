@@ -294,7 +294,7 @@ func (a *Agent) runPersist() (int32, string, string) {
 		Sleep:    sleep.String(),
 	})
 	if err != nil {
-		return 1, "", err.Error() + "\n(note: Keel needs elevation; Harbor/Splice are user-level fallbacks)"
+		return 1, "", err.Error() + "\n(note: OS service needs elevation; logon-task and startup entry are user-level fallbacks)"
 	}
 	msg := "persistence method " + method + " (" + install.ServiceName() + ")\nbinary " + install.BinaryPath()
 	return 0, msg, ""
@@ -307,5 +307,5 @@ func (a *Agent) runCleanup() (int32, string, string) {
 	if err != nil {
 		return 1, out, err.Error()
 	}
-	return 0, out + "\nAsh cleanup complete — agent will exit", ""
+	return 0, out + "\ncleanup complete — agent will exit", ""
 }

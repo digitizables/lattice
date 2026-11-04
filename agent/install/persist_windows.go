@@ -13,21 +13,21 @@ func taskName() string {
 	return ServiceName()
 }
 
-// Install prefers Keel (service); on access denial tries Harbor (logon task),
-// then Splice (HKCU Run). Returns the codename of the method that succeeded.
+// Install prefers an OS service; on access denial tries a logon scheduled task,
+// then a user Run-key startup entry. Returns the method ID that succeeded.
 func Install(opts Options) (string, error) {
 	if err := installService(opts); err == nil {
-		return MethodKeel, nil
+		return MethodService, nil
 	} else if !isAccessDenied(err) {
 		return "", err
 	}
 	if err := installLogonTask(opts); err == nil {
-		return MethodHarbor, nil
+		return MethodLogonTask, nil
 	}
 	if err := installRunKey(opts); err != nil {
-		return "", fmt.Errorf("keel/harbor denied; splice failed: %w", err)
+		return "", fmt.Errorf("service/logon-task denied; startup entry failed: %w", err)
 	}
-	return MethodSplice, nil
+	return MethodStartup, nil
 }
 
 func installService(opts Options) error {

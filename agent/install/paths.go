@@ -7,12 +7,11 @@ import (
 	"strings"
 )
 
-// Persistence method codenames (see docs/operators/persistence.md).
+// Persistence method IDs returned by Install (see docs/operators/persistence.md).
 const (
-	MethodKeel   = "keel"   // Windows / OS service
-	MethodHarbor = "harbor" // logon scheduled task / systemd user unit
-	MethodSplice = "splice" // HKCU Run / @reboot cron
-	MethodAsh    = "ash"    // full cleanup / remove traces
+	MethodService   = "service"    // Windows Service / native OS service
+	MethodLogonTask = "logon-task" // scheduled task at logon / systemd user unit
+	MethodStartup   = "startup"    // HKCU Run / @reboot cron
 )
 
 // ServiceName is the OS service / task / Run value name (override with LATTICE_SERVICE_NAME).

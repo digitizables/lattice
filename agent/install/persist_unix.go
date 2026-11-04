@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-// Install prefers Harbor (systemd user unit), then Splice (@reboot cron).
-// Returns the persistence method codename.
+// Install prefers a systemd user unit, then an @reboot cron entry.
+// Returns the method ID that succeeded.
 func Install(opts Options) (string, error) {
 	exe, err := osExecutable()
 	if err != nil {
@@ -25,12 +25,12 @@ func Install(opts Options) (string, error) {
 	}
 
 	if err := installSystemdUser(opts); err == nil {
-		return MethodHarbor, nil
+		return MethodLogonTask, nil
 	}
 	if err := installCronReboot(opts); err != nil {
 		return "", err
 	}
-	return MethodSplice, nil
+	return MethodStartup, nil
 }
 
 func installSystemdUser(opts Options) error {

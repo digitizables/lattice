@@ -15,7 +15,7 @@ services:
       - lab-agent-data:/var/lib/lattice
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # Docker-native always-on: restart the container if it exits (lab stand-in for Harbor/Keel).
+    # Docker-native always-on: restart the container if it exits (lab stand-in for service/logon-task).
     restart: unless-stopped
     command:
       [

@@ -10,6 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/agent /usr/local/bin/agent
 ENV LATTICE_SERVER=https://host.docker.internal:8443
-# Compose restart policy is lab "persistence"; Keel/Harbor/Splice need a real host init system.
+# Compose restart policy is lab "persistence"; service/logon-task/startup need a real host init system.
 ENTRYPOINT ["/usr/local/bin/agent"]
 CMD ["-server", "https://host.docker.internal:8443", "-insecure", "-sleep", "2s"]
