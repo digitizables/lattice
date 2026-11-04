@@ -39,3 +39,15 @@ go run ./client/cmd/client task <agent_id> echo hello
 Builtins today: `whoami`, `echo`, `hostname`.
 
 `client task` prints the task id, then waits on `StreamEvents` until the agent finishes (status lines, then stdout/stderr).
+
+## Web UI
+
+With the teamserver running:
+
+```text
+cd client/ui/web
+npm install
+npm run dev
+```
+
+Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:8080`.

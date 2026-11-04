@@ -66,6 +66,11 @@ func (s *Server) StreamEvents(
 	req *operatorv1.StreamEventsRequest,
 	stream operatorv1connect.OperatorServiceStreamEventsServerStream,
 ) error {
+	// Flush headers so clients can subscribe before the first event (avoids deadlock with submit-then-wait).
+	if err := stream.SendHeaders(); err != nil {
+		return err
+	}
+
 	filterAgent := req.GetAgentId()
 	events, unsub := s.core.SubscribeEvents(64)
 	defer unsub()

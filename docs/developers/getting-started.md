@@ -12,7 +12,7 @@ Get one full path working before anything else: from the operator through the se
 - **Agent runtime / transport**: Done (`whoami`, `echo`, `hostname`)
 - **Connect API + CLI**: Done (`sessions`, `task` waits on `StreamEvents`)
 - **Extension loader**: Done (manifest discover + builtin channel factories; remote install still pending)
-- **Web UI**: Pending
+- **Web UI**: Done (Vite + Svelte sessions/task console under `client/ui/web`)
 - **Compose teamserver/web images**: Scaffold only
 
 ### Lab run (once Postgres is up)
@@ -84,7 +84,7 @@ go mod tidy
 7. **`client` CLI** - done for sessions/task (waits for completion)
 8. **`packager/docker`** - Postgres service ready; images wait on polished release flow
 9. **Extension loader** - done for in-process channels; remote install later
-10. **Web UI** - after API stabilizes
+10. **Web UI** - done (`npm run dev` in `client/ui/web`, proxies Connect to `:8080`)
 
 ## Checklist
 
