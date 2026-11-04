@@ -10,7 +10,7 @@ Get one full path working before anything else: from the operator through the se
 - **Config** (`server/config`): Done
 - **HTTP channel + listen manager**: Done (cleartext HTTP for lab; TLS helper present)
 - **Agent runtime / transport**: Done (`whoami`, `echo`, `hostname`)
-- **Connect API + CLI**: Done (`sessions`, `task`; `StreamEvents` stub)
+- **Connect API + CLI**: Done (`sessions`, `task` waits on `StreamEvents`)
 - **Extension loader / remote install**: Pending
 - **Web UI**: Pending
 - **Compose teamserver/web images**: Scaffold only
@@ -75,8 +75,8 @@ go mod tidy
 3. **`server/core`** - done
 4. **`extensions/channels/http`** + **`server/listen`** - done
 5. **`agent/runtime`** + **`agent/transport`** - done
-6. **`server/api`** - done (streaming events still stubbed)
-7. **`client` CLI** - done for sessions/task
+6. **`server/api`** - done (`StreamEvents` live)
+7. **`client` CLI** - done for sessions/task (waits for completion)
 8. **`packager/docker`** - Postgres service ready; images wait on polished release flow
 9. **Extension loader** - next
 10. **Web UI** - after API stabilizes

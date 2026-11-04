@@ -13,11 +13,17 @@ import (
 // Core is the teamserver domain logic on top of the store.
 type Core struct {
 	store *store.Store
+	bus   *Bus
 }
 
 // New wraps a store.
 func New(s *store.Store) *Core {
-	return &Core{store: s}
+	return &Core{store: s, bus: newBus()}
+}
+
+// SubscribeEvents returns a live event feed for operators.
+func (c *Core) SubscribeEvents(buffer int) (<-chan Event, func()) {
+	return c.bus.Subscribe(buffer)
 }
 
 // HandleCheckIn upserts the agent and returns any queued tasks.
@@ -39,9 +45,19 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 		return nil, fmt.Errorf("upsert agent: %w", err)
 	}
 
+	agent, err := c.store.GetAgent(ctx, agentID)
+	if err != nil {
+		return nil, fmt.Errorf("load agent: %w", err)
+	}
+	c.bus.publish(Event{Session: &agent})
+
 	tasks, err := c.store.DequeueTasks(ctx, agentID, 16)
 	if err != nil {
 		return nil, fmt.Errorf("dequeue tasks: %w", err)
+	}
+	for i := range tasks {
+		t := tasks[i]
+		c.bus.publish(Event{Task: &t})
 	}
 
 	out := &agentv1.AgentCheckInResponse{
@@ -71,12 +87,22 @@ func (c *Core) HandleTaskResult(ctx context.Context, in *agentv1.AgentTaskResult
 	if err != nil {
 		return nil, err
 	}
+	task, err := c.store.GetTask(ctx, in.GetTaskId())
+	if err != nil {
+		return nil, err
+	}
+	c.bus.publish(Event{Task: &task})
 	return &agentv1.AgentTaskResultResponse{Accepted: true}, nil
 }
 
 // ListSessions returns agents as operator-facing session rows.
 func (c *Core) ListSessions(ctx context.Context) ([]store.Agent, error) {
 	return c.store.ListAgents(ctx)
+}
+
+// GetTask returns one task by id.
+func (c *Core) GetTask(ctx context.Context, taskID string) (store.Task, error) {
+	return c.store.GetTask(ctx, taskID)
 }
 
 // SubmitTask queues a task for an agent and returns the new task id.
@@ -94,5 +120,10 @@ func (c *Core) SubmitTask(ctx context.Context, agentID, name string, args []stri
 	if err != nil {
 		return "", err
 	}
+	task, err := c.store.GetTask(ctx, taskID)
+	if err != nil {
+		return "", err
+	}
+	c.bus.publish(Event{Task: &task})
 	return taskID, nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -25,11 +26,11 @@ func main() {
 	rpc := operatorv1connect.NewOperatorServiceClient(
 		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, baseURL)),
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
 
 	switch os.Args[1] {
 	case "sessions":
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
 		res, err := rpc.ListSessions(ctx, &operatorv1.ListSessionsRequest{})
 		if err != nil {
 			fail(err)
@@ -49,15 +50,63 @@ func main() {
 			fmt.Fprintln(os.Stderr, "usage: client task <agent_id> <name> [args...]")
 			os.Exit(2)
 		}
+		agentID := os.Args[2]
+		name := os.Args[3]
+		args := os.Args[4:]
+
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		stream, err := rpc.StreamEvents(ctx, &operatorv1.StreamEventsRequest{AgentId: agentID})
+		if err != nil {
+			fail(err)
+		}
+		defer stream.Close()
+
 		res, err := rpc.SubmitTask(ctx, &operatorv1.SubmitTaskRequest{
-			AgentId: os.Args[2],
-			Name:    os.Args[3],
-			Args:    os.Args[4:],
+			AgentId: agentID,
+			Name:    name,
+			Args:    args,
 		})
 		if err != nil {
 			fail(err)
 		}
-		fmt.Println(res.GetTaskId())
+		taskID := res.GetTaskId()
+		fmt.Println(taskID)
+
+		for {
+			ev, err := stream.Receive()
+			if err == io.EOF {
+				fail(fmt.Errorf("stream ended before task %s completed", taskID))
+			}
+			if err != nil {
+				fail(err)
+			}
+			tu := ev.GetTaskUpdated()
+			if tu == nil || tu.GetTaskId() != taskID {
+				continue
+			}
+			fmt.Printf("status=%s\n", tu.GetStatus())
+			if tu.GetStatus() != "completed" && tu.GetStatus() != "failed" {
+				continue
+			}
+			if tu.GetStdout() != "" {
+				fmt.Print(tu.GetStdout())
+				if tu.GetStdout()[len(tu.GetStdout())-1] != '\n' {
+					fmt.Println()
+				}
+			}
+			if tu.GetStderr() != "" {
+				fmt.Fprint(os.Stderr, tu.GetStderr())
+				if tu.GetStderr()[len(tu.GetStderr())-1] != '\n' {
+					fmt.Fprintln(os.Stderr)
+				}
+			}
+			if tu.GetExitCode() != 0 {
+				os.Exit(int(tu.GetExitCode()))
+			}
+			return
+		}
 	default:
 		console.Usage()
 		os.Exit(2)

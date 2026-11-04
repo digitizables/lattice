@@ -36,4 +36,4 @@ go run ./client/cmd/client task <agent_id> echo hello
 
 Builtins today: `whoami`, `echo`, `hostname`.
 
-Results are stored when the agent posts them. The CLI does not yet stream live task output (`StreamEvents` is unimplemented).
+`client task` prints the task id, then waits on `StreamEvents` until the agent finishes (status lines, then stdout/stderr).

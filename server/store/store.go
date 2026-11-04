@@ -146,6 +146,22 @@ FROM agents WHERE id = $1`
 	return a, nil
 }
 
+// GetTask returns one task by id.
+func (s *Store) GetTask(ctx context.Context, id string) (Task, error) {
+	const q = `
+SELECT id, agent_id, name, args, status, exit_code, stdout, stderr, created_at, updated_at
+FROM tasks WHERE id = $1`
+	row := s.pool.QueryRow(ctx, q, id)
+	var t Task
+	if err := row.Scan(
+		&t.ID, &t.AgentID, &t.Name, &t.Args, &t.Status,
+		&t.ExitCode, &t.Stdout, &t.Stderr, &t.CreatedAt, &t.UpdatedAt,
+	); err != nil {
+		return Task{}, err
+	}
+	return t, nil
+}
+
 // CreateTask inserts a queued task.
 func (s *Store) CreateTask(ctx context.Context, t Task) error {
 	args := t.Args
