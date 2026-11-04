@@ -43,3 +43,25 @@ message AgentTaskResult {
 message AgentTaskResultResponse {
   bool accepted = 1;
 }
+
+// Agent -> server: mark a dequeued task as executing.
+message AgentTaskRunning {
+  string agent_id = 1;
+  string task_id = 2;
+}
+
+message AgentTaskRunningResponse {
+  bool ok = 1;
+  // True if the operator already cancelled before execution started.
+  bool cancelled = 2;
+}
+
+// Agent -> server: poll for Ctrl+C / CancelTask while a command runs.
+message AgentTaskCancelPoll {
+  string agent_id = 1;
+  string task_id = 2;
+}
+
+message AgentTaskCancelPollResponse {
+  bool cancelled = 1;
+}

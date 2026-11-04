@@ -79,10 +79,15 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 
 // HandleTaskResult records an agent task result.
 func (c *Core) HandleTaskResult(ctx context.Context, in *agentv1.AgentTaskResult) (*agentv1.AgentTaskResultResponse, error) {
-	err := c.store.CompleteTask(
+	status := "completed"
+	if in.GetExitCode() == 130 {
+		status = "cancelled"
+	}
+	err := c.store.FinishTask(
 		ctx,
 		in.GetTaskId(),
 		in.GetAgentId(),
+		status,
 		in.GetExitCode(),
 		in.GetStdout(),
 		in.GetStderr(),
@@ -96,6 +101,40 @@ func (c *Core) HandleTaskResult(ctx context.Context, in *agentv1.AgentTaskResult
 	}
 	c.bus.publish(Event{Task: &task})
 	return &agentv1.AgentTaskResultResponse{Accepted: true}, nil
+}
+
+// MarkTaskRunning records that the agent started executing a task.
+func (c *Core) MarkTaskRunning(ctx context.Context, agentID, taskID string) (cancelled bool, err error) {
+	cancelled, err = c.store.MarkTaskRunning(ctx, taskID, agentID)
+	if err != nil {
+		return false, err
+	}
+	if task, getErr := c.store.GetTask(ctx, taskID); getErr == nil {
+		c.bus.publish(Event{Task: &task})
+	}
+	return cancelled, nil
+}
+
+// IsTaskCancelled reports cancel state for an in-flight agent command.
+func (c *Core) IsTaskCancelled(ctx context.Context, agentID, taskID string) (bool, error) {
+	return c.store.IsTaskCancelled(ctx, taskID, agentID)
+}
+
+// CancelTask aborts a queued/sent/running task (operator Ctrl+C).
+func (c *Core) CancelTask(ctx context.Context, taskID string) (bool, error) {
+	if taskID == "" {
+		return false, fmt.Errorf("task_id is required")
+	}
+	ok, err := c.store.CancelTask(ctx, taskID)
+	if err != nil {
+		return false, err
+	}
+	if ok {
+		if task, getErr := c.store.GetTask(ctx, taskID); getErr == nil {
+			c.bus.publish(Event{Task: &task})
+		}
+	}
+	return ok, nil
 }
 
 // ListSessions returns a page of agents.

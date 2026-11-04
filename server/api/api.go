@@ -88,20 +88,36 @@ func (s *Server) GetTask(
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err.Error())
 	}
+	return &operatorv1.GetTaskResponse{Task: storeTaskToUpdated(task)}, nil
+}
+
+func (s *Server) CancelTask(
+	ctx context.Context,
+	req *operatorv1.CancelTaskRequest,
+) (*operatorv1.CancelTaskResponse, error) {
+	if req.GetTaskId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, "task_id is required")
+	}
+	ok, err := s.core.CancelTask(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err.Error())
+	}
+	return &operatorv1.CancelTaskResponse{Cancelled: ok}, nil
+}
+
+func storeTaskToUpdated(task store.Task) *operatorv1.TaskUpdated {
 	var exit int32
 	if task.ExitCode != nil {
 		exit = *task.ExitCode
 	}
-	return &operatorv1.GetTaskResponse{
-		Task: &operatorv1.TaskUpdated{
-			TaskId:   task.ID,
-			AgentId:  task.AgentID,
-			Status:   task.Status,
-			Stdout:   task.Stdout,
-			Stderr:   task.Stderr,
-			ExitCode: exit,
-		},
-	}, nil
+	return &operatorv1.TaskUpdated{
+		TaskId:   task.ID,
+		AgentId:  task.AgentID,
+		Status:   task.Status,
+		Stdout:   task.Stdout,
+		Stderr:   task.Stderr,
+		ExitCode: exit,
+	}
 }
 
 func (s *Server) StreamEvents(

@@ -315,17 +315,69 @@ RETURNING t.id, t.agent_id, t.name, t.args, t.status, t.exit_code, t.stdout, t.s
 	return scanTasks(rows)
 }
 
+// MarkTaskRunning moves a sent task to running. Returns cancelled if operator already aborted.
+func (s *Store) MarkTaskRunning(ctx context.Context, taskID, agentID string) (cancelled bool, err error) {
+	var status string
+	err = s.pool.QueryRow(ctx, `SELECT status FROM tasks WHERE id = $1 AND agent_id = $2`, taskID, agentID).Scan(&status)
+	if err != nil {
+		return false, err
+	}
+	if status == "cancelled" {
+		return true, nil
+	}
+	tag, err := s.pool.Exec(ctx, `
+UPDATE tasks SET status = 'running', updated_at = NOW()
+WHERE id = $1 AND agent_id = $2 AND status IN ('queued', 'sent')`, taskID, agentID)
+	if err != nil {
+		return false, err
+	}
+	if tag.RowsAffected() == 0 {
+		err = s.pool.QueryRow(ctx, `SELECT status FROM tasks WHERE id = $1 AND agent_id = $2`, taskID, agentID).Scan(&status)
+		if err != nil {
+			return false, err
+		}
+		return status == "cancelled", nil
+	}
+	return false, nil
+}
+
+// CancelTask marks a non-terminal task as cancelled.
+func (s *Store) CancelTask(ctx context.Context, taskID string) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `
+UPDATE tasks SET status = 'cancelled', updated_at = NOW()
+WHERE id = $1 AND status IN ('queued', 'sent', 'running')`, taskID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// IsTaskCancelled reports whether the task was cancelled.
+func (s *Store) IsTaskCancelled(ctx context.Context, taskID, agentID string) (bool, error) {
+	var status string
+	err := s.pool.QueryRow(ctx, `SELECT status FROM tasks WHERE id = $1 AND agent_id = $2`, taskID, agentID).Scan(&status)
+	if err != nil {
+		return false, err
+	}
+	return status == "cancelled", nil
+}
+
 // CompleteTask stores a result from the agent.
 func (s *Store) CompleteTask(ctx context.Context, taskID, agentID string, exitCode int32, stdout, stderr string) error {
+	return s.FinishTask(ctx, taskID, agentID, "completed", exitCode, stdout, stderr)
+}
+
+// FinishTask writes a terminal task status (completed, failed, cancelled).
+func (s *Store) FinishTask(ctx context.Context, taskID, agentID, status string, exitCode int32, stdout, stderr string) error {
 	const q = `
 UPDATE tasks
-SET status = 'completed',
-    exit_code = $3,
-    stdout = $4,
-    stderr = $5,
+SET status = $3,
+    exit_code = $4,
+    stdout = $5,
+    stderr = $6,
     updated_at = NOW()
-WHERE id = $1 AND agent_id = $2 AND status IN ('queued', 'sent')`
-	tag, err := s.pool.Exec(ctx, q, taskID, agentID, exitCode, stdout, stderr)
+WHERE id = $1 AND agent_id = $2 AND status IN ('queued', 'sent', 'running', 'cancelled')`
+	tag, err := s.pool.Exec(ctx, q, taskID, agentID, status, exitCode, stdout, stderr)
 	if err != nil {
 		return err
 	}

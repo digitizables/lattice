@@ -161,9 +161,33 @@ export async function deleteSession(agentId: string): Promise<void> {
   await connectUnary<{ agentId: string }, Record<string, never>>("DeleteSession", { agentId });
 }
 
+export async function cancelTask(taskId: string): Promise<boolean> {
+  const data = await connectUnary<{ taskId: string }, { cancelled?: boolean }>("CancelTask", {
+    taskId,
+  });
+  return Boolean(data.cancelled);
+}
+
+/** Heuristic: commands that often dump huge directory/filesystem listings. */
+export function mayProduceLargeOutput(line: string): boolean {
+  const s = line.trim();
+  if (!s) return false;
+  const lower = s.toLowerCase();
+
+  if (/^(dir|tree)(\s|$)/i.test(s)) return true;
+  if (/^ls(\s|$)/i.test(s) && /(^|\s)-(r|R)\b/.test(s)) return true;
+  if (/^(get-childitem|gci|ls)\b/i.test(s) && /-recurse\b/i.test(s)) return true;
+  if (/^find(\s|$)/i.test(s)) return true;
+  if (/^(grep|rg)\b/i.test(s) && /(^|\s)-r\b/.test(lower)) return true;
+  if (/^shell\s+(dir|tree|find)\b/i.test(s)) return true;
+  if (/^cmd\s+(dir|tree)\b/i.test(s)) return true;
+  if (/^powershell\s+.*(get-childitem|gci).*-recurse/i.test(s)) return true;
+  return false;
+}
+
 /**
  * Submit a task, then poll GetTask until the agent finishes.
- * Avoids browser/proxy issues with long-lived Connect streams.
+ * Pass AbortSignal (Ctrl+C) to cancel remotely and stop waiting.
  */
 export async function submitTaskAndWait(
   agentId: string,
@@ -177,12 +201,29 @@ export async function submitTaskAndWait(
   onTaskId?.(taskId);
   onStatus?.("queued");
 
+  const abortRemote = async () => {
+    try {
+      await cancelTask(taskId);
+    } catch {
+      // best-effort
+    }
+  };
+  if (signal) {
+    if (signal.aborted) {
+      await abortRemote();
+      throw new Error("^C");
+    }
+    signal.addEventListener("abort", () => {
+      void abortRemote();
+    }, { once: true });
+  }
+
   const started = Date.now();
   let lastStatus = "queued";
   let queuedHintAt = 0;
   while (Date.now() - started < 120_000) {
     if (signal?.aborted) {
-      throw new Error("cancelled");
+      throw new Error("^C");
     }
     await sleep(400, signal);
     const task = await getTask(taskId);
@@ -203,6 +244,9 @@ export async function submitTaskAndWait(
           "task still queued after 20s — that session is probably offline. Pick an online session or run: go run ./agent/cmd/agent -server https://127.0.0.1:8443",
         );
       }
+    }
+    if (task.status === "cancelled") {
+      throw new Error("^C");
     }
     if (task.status === "completed" || task.status === "failed") {
       return task;

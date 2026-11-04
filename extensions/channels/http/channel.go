@@ -50,6 +50,8 @@ func (c *Channel) Start(ctx context.Context, addr string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/checkin", c.handleCheckIn)
 	mux.HandleFunc("POST /v1/result", c.handleResult)
+	mux.HandleFunc("POST /v1/task_running", c.handleTaskRunning)
+	mux.HandleFunc("POST /v1/task_cancel_poll", c.handleTaskCancelPoll)
 
 	c.server = &http.Server{
 		Addr:              addr,
@@ -145,6 +147,58 @@ func (c *Channel) handleResult(w http.ResponseWriter, r *http.Request) {
 	}
 
 	raw, err := proto.Marshal(out)
+	if err != nil {
+		http.Error(w, "marshal", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(raw)
+}
+
+func (c *Channel) handleTaskRunning(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var in agentv1.AgentTaskRunning
+	if err := proto.Unmarshal(body, &in); err != nil {
+		http.Error(w, "bad protobuf", http.StatusBadRequest)
+		return
+	}
+	cancelled, err := c.core.MarkTaskRunning(r.Context(), in.GetAgentId(), in.GetTaskId())
+	if err != nil {
+		c.log.Error("task running failed", "err", err)
+		http.Error(w, "task running failed", http.StatusInternalServerError)
+		return
+	}
+	raw, err := proto.Marshal(&agentv1.AgentTaskRunningResponse{Ok: true, Cancelled: cancelled})
+	if err != nil {
+		http.Error(w, "marshal", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(raw)
+}
+
+func (c *Channel) handleTaskCancelPoll(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var in agentv1.AgentTaskCancelPoll
+	if err := proto.Unmarshal(body, &in); err != nil {
+		http.Error(w, "bad protobuf", http.StatusBadRequest)
+		return
+	}
+	cancelled, err := c.core.IsTaskCancelled(r.Context(), in.GetAgentId(), in.GetTaskId())
+	if err != nil {
+		c.log.Error("cancel poll failed", "err", err)
+		http.Error(w, "cancel poll failed", http.StatusInternalServerError)
+		return
+	}
+	raw, err := proto.Marshal(&agentv1.AgentTaskCancelPollResponse{Cancelled: cancelled})
 	if err != nil {
 		http.Error(w, "marshal", http.StatusInternalServerError)
 		return

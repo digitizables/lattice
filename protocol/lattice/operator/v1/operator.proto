@@ -11,6 +11,7 @@ service OperatorService {
   rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
   rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
 }
 
@@ -63,6 +64,14 @@ message GetTaskResponse {
   TaskUpdated task = 1;
 }
 
+message CancelTaskRequest {
+  string task_id = 1;
+}
+
+message CancelTaskResponse {
+  bool cancelled = 1;
+}
+
 message StreamEventsRequest {
   // Empty = all agents (task events only; routine check-ins are not broadcast).
   string agent_id = 1;
@@ -82,7 +91,7 @@ message SessionUpdated {
 message TaskUpdated {
   string task_id = 1;
   string agent_id = 2;
-  // queued | sent | completed | failed
+  // queued | sent | running | completed | failed | cancelled
   string status = 3;
   string stdout = 4;
   string stderr = 5;

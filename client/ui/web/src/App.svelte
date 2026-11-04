@@ -4,6 +4,7 @@
     accountName,
     deleteSession,
     listSessions,
+    mayProduceLargeOutput,
     submitTaskAndWait,
     userAtHost,
     type Session,
@@ -39,6 +40,8 @@
   let pickerQuery = $state("");
   let pickerSessions = $state<Session[]>([]);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let activeAbort: AbortController | null = null;
+  let activeTaskId = $state("");
 
   const selected = $derived(
     selectedSession && selectedSession.agentId === selectedAgent
@@ -181,9 +184,21 @@
       return;
     }
     if (taskBusy) {
-      await appendTerm('<span class="term-err">already waiting on a task</span>');
+      await appendTerm('<span class="term-err">already waiting on a task — press Ctrl+C to abort</span>');
       return;
     }
+    const line = [cmd, ...args].join(" ");
+    if (mayProduceLargeOutput(line)) {
+      const ok = window.confirm(
+        `“${line}” often produces a large amount of output.\n\nRun it anyway?`,
+      );
+      if (!ok) {
+        await appendTerm(`${promptPrefix(selected)} <span class="term-muted">${escapeHtml(line)}</span>`);
+        await appendTerm('<span class="term-muted">cancelled — large output not confirmed</span>');
+        return;
+      }
+    }
+
     taskBusy = true;
     error = "";
     const agent = selected;
@@ -192,8 +207,10 @@
         '<span class="term-err">selected session looks offline (no recent check-in). Pick a live session or start the agent.</span>',
       );
     }
-    const line = [cmd, ...args].join(" ");
     await appendTerm(`${promptPrefix(agent)} <span class="term-muted">${escapeHtml(line)}</span>`);
+    const ac = new AbortController();
+    activeAbort = ac;
+    activeTaskId = "";
     try {
       const result = await submitTaskAndWait(
         selectedAgent,
@@ -203,8 +220,10 @@
           void appendTerm(`<span class="term-muted">status=${escapeHtml(status)}</span>`);
         },
         (taskId) => {
+          activeTaskId = taskId;
           void appendTerm(`<span class="term-path">task ${escapeHtml(taskId)}</span>`);
         },
+        ac.signal,
       );
       if (result.stdout) {
         await appendTerm(escapeHtml(result.stdout.replace(/\n$/, "")));
@@ -214,9 +233,15 @@
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      await appendTerm(`<span class="term-err">${escapeHtml(msg)}</span>`);
+      if (msg === "^C") {
+        await appendTerm('<span class="term-err">^C</span>');
+      } else {
+        await appendTerm(`<span class="term-err">${escapeHtml(msg)}</span>`);
+      }
     } finally {
       taskBusy = false;
+      activeAbort = null;
+      activeTaskId = "";
       focusTerminal();
     }
   }
@@ -240,6 +265,7 @@
       await appendTerm(`${promptPrefix(selected)} <span class="term-muted">help</span>`);
       await appendTerm('<span class="term-muted">Agent builtins: whoami, echo, hostname</span>');
       await appendTerm('<span class="term-muted">Shells: shell|cmd|powershell &lt;line&gt; · or type a native command (dir, ls, …)</span>');
+      await appendTerm('<span class="term-muted">Ctrl+C aborts a running task. Wide listings (dir/tree/…) ask for confirmation first.</span>');
       await appendTerm('<span class="term-muted">Local: help, clear, sessions [query], use &lt;agent_id&gt;</span>');
       return;
     }
@@ -281,8 +307,17 @@
   }
 
   async function onTermKeydown(e: KeyboardEvent) {
+    if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
+      if (taskBusy && activeAbort) {
+        e.preventDefault();
+        activeAbort.abort();
+        await appendTerm('<span class="term-muted">interrupt sent — waiting for agent to stop…</span>');
+      }
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
+      if (taskBusy) return;
       const value = termInput;
       termInput = "";
       await handleCommand(value);

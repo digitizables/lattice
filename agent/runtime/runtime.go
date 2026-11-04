@@ -77,7 +77,7 @@ func (a *Agent) beat(ctx context.Context) error {
 	a.Log.Info("check-in ok", "agent_id", a.ID, "tasks", len(resp.GetTasks()))
 
 	for _, t := range resp.GetTasks() {
-		exitCode, stdout, stderr := runTask(ctx, t)
+		exitCode, stdout, stderr := a.runTask(ctx, t)
 		_, err := a.Transport.PostResult(ctx, &agentv1.AgentTaskResult{
 			AgentId:  a.ID,
 			TaskId:   t.GetTaskId(),

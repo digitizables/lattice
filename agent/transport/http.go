@@ -59,6 +59,26 @@ func (h *HTTP) PostResult(ctx context.Context, in *agentv1.AgentTaskResult) (*ag
 	return &out, nil
 }
 
+// MarkRunning tells the server execution started; cancelled means abort before start.
+func (h *HTTP) MarkRunning(ctx context.Context, agentID, taskID string) (cancelled bool, err error) {
+	var out agentv1.AgentTaskRunningResponse
+	err = h.post(ctx, "/v1/task_running", &agentv1.AgentTaskRunning{
+		AgentId: agentID,
+		TaskId:  taskID,
+	}, &out)
+	return out.GetCancelled(), err
+}
+
+// PollCancel returns true when the operator cancelled the task.
+func (h *HTTP) PollCancel(ctx context.Context, agentID, taskID string) (bool, error) {
+	var out agentv1.AgentTaskCancelPollResponse
+	err := h.post(ctx, "/v1/task_cancel_poll", &agentv1.AgentTaskCancelPoll{
+		AgentId: agentID,
+		TaskId:  taskID,
+	}, &out)
+	return out.GetCancelled(), err
+}
+
 func (h *HTTP) post(ctx context.Context, path string, in, out proto.Message) error {
 	raw, err := proto.Marshal(in)
 	if err != nil {
