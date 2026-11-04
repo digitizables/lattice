@@ -229,17 +229,6 @@
       <div class="brand">Lattice</div>
       <div class="descriptor">Operator console</div>
     </div>
-    <div class="window-controls" aria-hidden="true">
-      <button class="win-btn" tabindex="-1" title="Minimize">
-        <svg width="10" height="10" viewBox="0 0 10 10"><rect y="4.5" width="10" height="1" fill="currentColor" /></svg>
-      </button>
-      <button class="win-btn" tabindex="-1" title="Maximize">
-        <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" /></svg>
-      </button>
-      <button class="win-btn close" tabindex="-1" title="Close">
-        <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.2" /></svg>
-      </button>
-    </div>
   </header>
 
   <div class="shell">
@@ -300,21 +289,8 @@
             focusTerminal();
           }}>Console</button
         >
-        {#if selected}
-          <button
-            class="folder-tab"
-            class:active={nav === "console"}
-            title={selected.agentId}
-            onclick={() => {
-              nav = "console";
-              focusTerminal();
-            }}
-          >
-            {selected.hostname}
-            <span class="tab-x">×</span>
-          </button>
-        {/if}
-        <button class="add-tab" title="Refresh sessions" onclick={() => refresh()}>+</button>
+        <button class="folder-tab" class:active={nav === "listeners"} onclick={() => (nav = "listeners")}>Listeners</button>
+        <button class="folder-tab" class:active={nav === "settings"} onclick={() => (nav = "settings")}>Settings</button>
       </div>
 
       <div class="workspace-body">
