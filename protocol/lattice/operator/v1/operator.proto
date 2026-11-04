@@ -32,6 +32,8 @@ message ListSessionsResponse {
   string next_page_token = 2;
   // Total matching rows for the current query (not just this page).
   int32 total_count = 3;
+  // Agents with a recent check-in (default window: 30s), matching the same query.
+  int32 active_count = 4;
 }
 
 message DeleteSessionRequest {

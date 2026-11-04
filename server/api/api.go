@@ -43,6 +43,7 @@ func (s *Server) ListSessions(
 	resp := &operatorv1.ListSessionsResponse{
 		NextPageToken: page.NextPageToken,
 		TotalCount:    page.TotalCount,
+		ActiveCount:   page.ActiveCount,
 	}
 	for _, a := range page.Agents {
 		resp.Sessions = append(resp.Sessions, agentToSession(a))

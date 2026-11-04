@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -14,15 +15,52 @@ import (
 
 // Core is the teamserver domain logic on top of the store.
 type Core struct {
-	store   *store.Store
-	bus     *Bus
-	updates *updates.Store
-	modules *modules.Store
+	store            *store.Store
+	bus              *Bus
+	updates          *updates.Store
+	modules          *modules.Store
+	allowLocalAgents bool
+	serverHostname   string
+}
+
+// Options configures optional Core behavior.
+type Options struct {
+	AllowLocalAgents bool
+	ServerHostname   string
 }
 
 // New wraps a store and optional update/module catalogs.
-func New(s *store.Store, u *updates.Store, m *modules.Store) *Core {
-	return &Core{store: s, bus: newBus(), updates: u, modules: m}
+func New(s *store.Store, u *updates.Store, m *modules.Store, opts Options) *Core {
+	return &Core{
+		store:            s,
+		bus:              newBus(),
+		updates:          u,
+		modules:          m,
+		allowLocalAgents: opts.AllowLocalAgents,
+		serverHostname:   opts.ServerHostname,
+	}
+}
+
+// RejectLocalAgent reports whether an implant on the command-center host should be refused.
+// Matching is by reported hostname (not RemoteAddr): Docker Desktop often makes
+// container-to-host traffic look like loopback, which would break lab agents.
+func (c *Core) RejectLocalAgent(_remoteIP, agentHostname string) bool {
+	if c.allowLocalAgents {
+		return false
+	}
+	if c.serverHostname == "" || agentHostname == "" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(c.serverHostname), strings.TrimSpace(agentHostname))
+}
+
+// PurgeCommandCenterSessions deletes any leftover agents whose hostname matches
+// the teamserver host. No-op when local agents are allowed or hostname is empty.
+func (c *Core) PurgeCommandCenterSessions(ctx context.Context) (int64, error) {
+	if c.allowLocalAgents || c.serverHostname == "" {
+		return 0, nil
+	}
+	return c.store.DeleteAgentsByHostname(ctx, c.serverHostname)
 }
 
 // SubscribeEvents returns a live event feed for operators.

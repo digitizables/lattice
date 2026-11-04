@@ -76,6 +76,7 @@ export type ListSessionsResult = {
   sessions: Session[];
   nextPageToken: string;
   totalCount: number;
+  activeCount: number;
 };
 
 // Talk to the teamserver directly in lab/dev. Vite's proxy breaks Connect streams
@@ -166,6 +167,7 @@ export async function listSessions(params: ListSessionsParams = {}): Promise<Lis
     sessions: ((data.sessions as Record<string, unknown>[] | undefined) ?? []).map(mapSession),
     nextPageToken: String(data.nextPageToken ?? ""),
     totalCount: Number(data.totalCount ?? 0),
+    activeCount: Number(data.activeCount ?? 0),
   };
 }
 
@@ -268,7 +270,7 @@ export async function submitTaskAndWait(
       if (waited >= 20_000) {
         await abortRemote();
         throw new Error(
-          "task still queued after 20s — that session is probably offline. Pick an online session or run: go run ./agent/cmd/agent -server https://127.0.0.1:8443",
+          "task still queued after 20s — that session is probably offline. Pick an online session or start the Docker lab agent (packager/docker/docker-compose.lab.yml).",
         );
       }
     }

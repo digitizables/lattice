@@ -1,6 +1,8 @@
 # Persistence methods
 
-Lattice ships three basic always-on persistence methods. Operators choose (or the installer falls back) based on privilege. Override visible names and paths with env vars when you need a quieter footprint.
+Lattice ships three basic always-on persistence methods for **target** hosts. Do not install an implant on the command-center machine: the teamserver refuses check-ins whose hostname matches its own (`LATTICE_ALLOW_LOCAL_AGENTS=false`) and purges leftover matching sessions on start. Lab always-on uses the Compose lab-agent service instead.
+
+Operators choose (or the installer falls back) based on privilege. Override visible names and paths with env vars when you need a quieter footprint.
 
 | Codename | Technical ID | Platform mechanism | Typical privilege | Survives |
 |----------|--------------|--------------------|-------------------|----------|

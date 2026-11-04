@@ -134,12 +134,30 @@ func (s *Store) DeleteAgent(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteAgentsByHostname removes every agent whose hostname matches (case-insensitive).
+// Used to purge leftover command-center host sessions when local agents are denied.
+func (s *Store) DeleteAgentsByHostname(ctx context.Context, hostname string) (int64, error) {
+	hostname = strings.TrimSpace(hostname)
+	if hostname == "" {
+		return 0, nil
+	}
+	tag, err := s.pool.Exec(ctx, `DELETE FROM agents WHERE lower(hostname) = lower($1)`, hostname)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // AgentPage is one page of agents plus pagination metadata.
 type AgentPage struct {
 	Agents        []Agent
 	NextPageToken string
 	TotalCount    int32
+	ActiveCount   int32
 }
+
+// ActiveWindow is how recent last_seen must be to count as online.
+const ActiveWindow = 30 * time.Second
 
 // ListAgentsPage returns a cursor page of agents ordered by last_seen DESC, id DESC.
 func (s *Store) ListAgentsPage(ctx context.Context, pageSize int32, pageToken, query string) (AgentPage, error) {
@@ -168,6 +186,13 @@ func (s *Store) ListAgentsPage(ctx context.Context, pageSize int32, pageToken, q
 	countQ := `SELECT COUNT(*) FROM agents WHERE ` + strings.Join(filterWhere, " AND ")
 	var total int32
 	if err := s.pool.QueryRow(ctx, countQ, filterArgs...).Scan(&total); err != nil {
+		return AgentPage{}, err
+	}
+
+	activeWhere := append(append([]string{}, filterWhere...), "last_seen > NOW() - INTERVAL '30 seconds'")
+	activeQ := `SELECT COUNT(*) FROM agents WHERE ` + strings.Join(activeWhere, " AND ")
+	var active int32
+	if err := s.pool.QueryRow(ctx, activeQ, filterArgs...).Scan(&active); err != nil {
 		return AgentPage{}, err
 	}
 
@@ -216,7 +241,7 @@ LIMIT ` + limitPlaceholder
 		return AgentPage{}, err
 	}
 
-	page := AgentPage{Agents: out, TotalCount: total}
+	page := AgentPage{Agents: out, TotalCount: total, ActiveCount: active}
 	if int32(len(out)) == pageSize && len(out) > 0 {
 		last := out[len(out)-1]
 		page.NextPageToken = encodeAgentCursor(last.LastSeen, last.ID)

@@ -22,13 +22,13 @@ go run ./server/cmd/teamserver
 
 Lab TLS certs are created under `data/certs/` on first start.
 
-3. Start an agent:
+3. Start a **lab agent in Docker** (recommended — do not run implants on the command-center host):
 
 ```text
-go run ./agent/cmd/agent -server https://127.0.0.1:8443
+docker compose -f packager/docker/docker-compose.lab.yml up -d --build
 ```
 
-The agent persists its ID under the OS config dir (`%AppData%\lattice\agent.id` on Windows) so restarts reconnect as the same session. Override with `-id-file` or `LATTICE_AGENT_ID_FILE`.
+The command-center machine is refused as a session by default (`LATTICE_ALLOW_LOCAL_AGENTS=false`). Lab persistence is the Compose `restart: unless-stopped` policy (see [persistence.md](persistence.md) for Keel/Harbor/Splice on real targets).
 
 4. List sessions and task:
 
@@ -71,28 +71,22 @@ Open a session in **Console**, then type commands and press Enter. The shell sta
 
 Persistence method codenames (**Keel**, **Harbor**, **Splice**) and full wipe (**Ash**) are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
 
-### Always-on agent (recommended)
+### Lab vs target persistence
 
-Install once so the agent stays online across logoff/reboot without a manual terminal:
+The **command-center host is never a session**. Check-ins whose hostname matches the teamserver are rejected (`LATTICE_ALLOW_LOCAL_AGENTS=false` by default), and leftover matching rows are purged on teamserver start.
 
-```text
-.\bin\agent.exe -server https://127.0.0.1:8443 install
-```
+- **Lab:** keep the Docker lab agent up with `docker compose -f packager/docker/docker-compose.lab.yml up -d` (`restart: unless-stopped`).
+- **Real targets:** from a live remote session run `persist`, or run `agent install` on that target only. Methods are **Keel** / **Harbor** / **Splice** (see [persistence.md](persistence.md)).
 
-- **Elevated:** installs a Windows service / system unit (restart=always).
-- **Unelevated:** falls back to a per-user logon Scheduled Task (Windows) or systemd user unit / `@reboot` cron (Unix), and starts immediately.
-
-Or from the console against a live session: `persist`.
-
-Remove persistence registration only:
+Remove persistence registration on a target:
 
 ```text
 .\bin\agent.exe uninstall
 ```
 
-### Remove all traces from a host
+### Remove all traces from a target
 
-From an elevated shell on the target:
+From an elevated shell on the **target** (never the command center):
 
 ```text
 .\bin\agent.exe cleanup

@@ -1,0 +1,14 @@
+FROM golang:1.26-bookworm AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -ldflags "-X github.com/digitizables/lattice/internal/version.Version=0.2.1" -o /out/agent ./agent/cmd/agent
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /out/agent /usr/local/bin/agent
+ENV LATTICE_SERVER=https://host.docker.internal:8443
+# Compose restart policy is lab "persistence"; Keel/Harbor/Splice need a real host init system.
+ENTRYPOINT ["/usr/local/bin/agent"]
+CMD ["-server", "https://host.docker.internal:8443", "-insecure", "-sleep", "2s"]

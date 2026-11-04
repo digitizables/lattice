@@ -19,6 +19,7 @@
 
   let sessions = $state<Session[]>([]);
   let totalCount = $state(0);
+  let activeCount = $state(0);
   let nextPageToken = $state("");
   let pageTokens = $state<string[]>([""]); // tokens to fetch each page; index 0 is first page
   let pageIndex = $state(0);
@@ -136,6 +137,7 @@
       });
       sessions = res.sessions;
       totalCount = res.totalCount;
+      activeCount = res.activeCount;
       nextPageToken = res.nextPageToken;
       pageIndex = index;
       if (res.nextPageToken) {
@@ -744,7 +746,10 @@
       </div>
 
       <footer class="footer-bar">
-        <span><span class="live">●</span> {totalCount.toLocaleString()} session{totalCount === 1 ? "" : "s"}</span>
+        <span
+          ><span class="live">●</span>
+          {activeCount.toLocaleString()} active session{activeCount === 1 ? "" : "s"}</span
+        >
         <span>↑↓ history · Ctrl+L clear</span>
       </footer>
     </section>

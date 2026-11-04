@@ -1,0 +1,16 @@
+# Lab agents for testing. Teamserver is expected on the host (or expose :8443).
+# Usage (from repo root):
+#   docker compose -f packager/docker/docker-compose.lab.yml up -d --build
+services:
+  lab-agent:
+    build:
+      context: ../..
+      dockerfile: packager/docker/Dockerfile.agent
+    hostname: lab-agent
+    environment:
+      LATTICE_SERVER: https://host.docker.internal:8443
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Docker-native always-on: restart the container if it exits (lab stand-in for Harbor/Keel).
+    restart: unless-stopped
+    command: ["-server", "https://host.docker.internal:8443", "-insecure", "-sleep", "2s"]

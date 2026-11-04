@@ -58,7 +58,21 @@ func main() {
 	}
 	log.Info("module catalog", "dir", cfg.ModulesDir)
 
-	c := core.New(st, up, mods)
+	c := core.New(st, up, mods, core.Options{
+		AllowLocalAgents: cfg.AllowLocalAgents,
+		ServerHostname:   cfg.Hostname,
+	})
+	if !cfg.AllowLocalAgents {
+		log.Info("local agents denied", "hostname", cfg.Hostname, "hint", "set LATTICE_ALLOW_LOCAL_AGENTS=true to override")
+		n, err := c.PurgeCommandCenterSessions(ctx)
+		if err != nil {
+			log.Error("purge command-center sessions", "err", err)
+			os.Exit(1)
+		}
+		if n > 0 {
+			log.Info("purged command-center host sessions", "count", n, "hostname", cfg.Hostname)
+		}
+	}
 	mgr := listen.NewManager()
 
 	deps := extensions.ChannelDeps{Core: c, Log: log, Cleartext: cfg.AgentCleartext}

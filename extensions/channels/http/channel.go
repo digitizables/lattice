@@ -114,6 +114,13 @@ func (c *Channel) handleCheckIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if c.core.RejectLocalAgent(r.RemoteAddr, in.GetHostname()) {
+		c.log.Warn("rejected local/command-center agent check-in",
+			"remote", r.RemoteAddr, "hostname", in.GetHostname())
+		http.Error(w, "agents on the command-center host are not allowed", http.StatusForbidden)
+		return
+	}
+
 	out, err := c.core.HandleCheckIn(r.Context(), &in)
 	if err != nil {
 		c.log.Error("check-in failed", "err", err)
