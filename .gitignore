@@ -1,0 +1,40 @@
+# Generated protobuf / Connect code
+/gen/
+
+# Binaries
+/bin/
+/bin/**
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Go
+vendor/
+
+# Runtime / local data (keep the directory)
+/data/**
+!/data/.gitkeep
+
+# Env and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Node / web (later)
+node_modules/
+client/ui/web/dist/
+client/ui/web/.svelte-kit/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Buf lock is committed when present; local cache is not
+.buf/

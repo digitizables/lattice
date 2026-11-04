@@ -1,0 +1,9 @@
+# Default HTTP channel profile. Fields will matter once listen/generate read this file.
+name: http-default
+channel: http
+bind_addr: "0.0.0.0:8443"
+# Public callback host agents should use (override per deployment).
+callback_host: "127.0.0.1"
+callback_port: 8443
+sleep_seconds: 5
+jitter_percent: 20

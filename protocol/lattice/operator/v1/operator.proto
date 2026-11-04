@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package lattice.operator.v1;
+
+option go_package = "github.com/digitizables/lattice/gen/lattice/operator/v1;operatorv1";
+
+import "google/protobuf/timestamp.proto";
+
+service OperatorService {
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
+  rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
+}
+
+message ListSessionsRequest {}
+
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+}
+
+message Session {
+  string agent_id = 1;
+  string hostname = 2;
+  string username = 3;
+  string os = 4;
+  string arch = 5;
+  google.protobuf.Timestamp last_seen = 6;
+}
+
+message SubmitTaskRequest {
+  string agent_id = 1;
+  string name = 2;
+  repeated string args = 3;
+}
+
+message SubmitTaskResponse {
+  string task_id = 1;
+}
+
+message StreamEventsRequest {
+  // Empty = all agents.
+  string agent_id = 1;
+}
+
+message StreamEventsResponse {
+  oneof payload {
+    SessionUpdated session_updated = 1;
+    TaskUpdated task_updated = 2;
+  }
+}
+
+message SessionUpdated {
+  Session session = 1;
+}
+
+message TaskUpdated {
+  string task_id = 1;
+  string agent_id = 2;
+  // queued | sent | completed | failed
+  string status = 3;
+  string stdout = 4;
+  string stderr = 5;
+  int32 exit_code = 6;
+}

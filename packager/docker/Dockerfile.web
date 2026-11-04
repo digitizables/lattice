@@ -1,0 +1,6 @@
+# Placeholder SPA image. Replace the COPY source once client/ui/web exists.
+FROM nginx:1.27-alpine
+COPY packager/docker/nginx.conf /etc/nginx/conf.d/default.conf
+# Empty site root for now; Vite dist lands here later.
+RUN mkdir -p /usr/share/nginx/html
+EXPOSE 80

@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package lattice.agent.v1;
+
+option go_package = "github.com/digitizables/lattice/gen/lattice/agent/v1;agentv1";
+
+// Agent -> server on each beacon.
+message AgentCheckIn {
+  // Empty on first contact; server-assigned id after that.
+  string agent_id = 1;
+
+  string hostname = 2;
+  string username = 3;
+  string os = 4;
+  string arch = 5;
+
+  // Agent's configured sleep; informational for operators.
+  uint64 sleep_seconds = 6;
+}
+
+// Server -> agent after check-in.
+message AgentCheckInResponse {
+  string agent_id = 1;
+  repeated Task tasks = 2;
+}
+
+message Task {
+  string task_id = 1;
+  // Builtin name, e.g. "whoami", "echo".
+  string name = 2;
+  repeated string args = 3;
+}
+
+// Agent -> server after running a task.
+message AgentTaskResult {
+  string agent_id = 1;
+  string task_id = 2;
+  int32 exit_code = 3;
+  string stdout = 4;
+  string stderr = 5;
+}
+
+message AgentTaskResultResponse {
+  bool accepted = 1;
+}
