@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	connectrpc.com/connect/v2 v2.0.2
+	github.com/creack/pty v1.1.24
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/kardianos/service v1.2.2

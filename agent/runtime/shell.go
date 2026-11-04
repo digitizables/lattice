@@ -128,10 +128,8 @@ func (a *Agent) runShell(ctx context.Context, taskID, kind, line string) (exitCo
 	cmd := exec.CommandContext(runCtx, path, argv...)
 	a.ensureCwd()
 	cmd.Dir = a.Cwd
+	applyShellColorEnv(cmd)
 	hideWindow(cmd)
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
 
 	stopPoll := make(chan struct{})
 	if a.Transport != nil && taskID != "" {
@@ -160,7 +158,8 @@ func (a *Agent) runShell(ctx context.Context, taskID, kind, line string) (exitCo
 		}()
 	}
 
-	runErr := cmd.Run()
+	var outBuf, errBuf bytes.Buffer
+	runErr := runShellProcess(cmd, &outBuf, &errBuf)
 	close(stopPoll)
 
 	stdout = truncateOutput(outBuf.String())

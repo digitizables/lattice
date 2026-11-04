@@ -9,12 +9,8 @@
     type PathDisplay,
     type Session,
   } from "./api";
-  import {
-    dialectForSession,
-    escapeHtml,
-    formatTermOutput,
-    highlightShell,
-  } from "./shellHighlight";
+  import { formatTermOutput } from "./ansiOutput";
+  import { dialectForSession, escapeHtml, highlightShell } from "./shellHighlight";
 
   let {
     agentId = "",

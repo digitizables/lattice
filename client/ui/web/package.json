@@ -10,11 +10,14 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@types/highlight.js": "^9.12.4",
     "svelte": "^5.19.0",
     "typescript": "^5.7.3",
     "vite": "^6.0.11"
   },
   "dependencies": {
+    "ansi_up": "^6.0.6",
+    "highlight.js": "^11.12.0",
     "marked": "^18.1.3"
   }
 }

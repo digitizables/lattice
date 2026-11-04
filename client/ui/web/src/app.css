@@ -803,7 +803,9 @@ table.sessions tr.selected {
 
 .terminal-canvas {
   flex: 1;
-  overflow: auto;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 12px 20px 8px;
   font-size: 13px;
   line-height: 1.45;
@@ -811,11 +813,61 @@ table.sessions tr.selected {
 }
 
 .term-line {
+  display: block;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
   max-width: 100%;
+  min-width: 0;
   animation: slide-up 120ms ease-out;
+}
+
+/* highlight.js token colors (command input) — dark console theme */
+.term-input-mirror .hljs-keyword,
+.term-line .hljs-keyword,
+.term-input-mirror .hljs-selector-tag,
+.term-input-mirror .hljs-built_in,
+.term-line .hljs-built_in {
+  color: #7dd3fc;
+}
+.term-input-mirror .hljs-string,
+.term-line .hljs-string {
+  color: #86efac;
+}
+.term-input-mirror .hljs-number,
+.term-line .hljs-number {
+  color: #fdba74;
+}
+.term-input-mirror .hljs-comment,
+.term-line .hljs-comment {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.term-input-mirror .hljs-meta,
+.term-input-mirror .hljs-literal,
+.term-line .hljs-meta {
+  color: #fbbf24;
+}
+.term-input-mirror .hljs-variable,
+.term-input-mirror .hljs-template-variable,
+.term-line .hljs-variable {
+  color: #c4b5fd;
+}
+.term-input-mirror .hljs-attr,
+.term-input-mirror .hljs-attribute,
+.term-line .hljs-attr {
+  color: #f9a8d4;
+}
+.term-input-mirror .hljs-title,
+.term-input-mirror .hljs-name,
+.term-line .hljs-title {
+  color: #7dd3fc;
+  font-weight: 500;
+}
+.term-input-mirror .hljs-symbol,
+.term-input-mirror .hljs-bullet,
+.term-line .hljs-symbol {
+  color: #f9a8d4;
 }
 
 .term-identity {

@@ -10,17 +10,25 @@ import (
 	"path/filepath"
 )
 
+// colorPrelude defines ls/grep helpers so --color=auto runs under our PTY
+// (GNU ls disables color unless --color is passed; interactive aliases are absent here).
+const colorPrelude = `ls(){ command ls --color=auto "$@"; }; ` +
+	`grep(){ command grep --color=auto "$@"; }; ` +
+	`egrep(){ command grep -E --color=auto "$@"; }; ` +
+	`fgrep(){ command grep -F --color=auto "$@"; }; `
+
 func shellInvocation(kind, line string) (path string, argv []string, err error) {
+	script := colorPrelude + line
 	switch kind {
 	case "default", "shell", "run", "sh":
 		path = unixShellPath()
-		return path, []string{"-c", line}, nil
+		return path, []string{"-c", script}, nil
 	case "bash":
 		path, err = exec.LookPath("bash")
 		if err != nil {
 			return "", nil, fmt.Errorf("bash not found: %w", err)
 		}
-		return path, []string{"-c", line}, nil
+		return path, []string{"-c", script}, nil
 	case "cmd", "powershell", "ps", "pwsh":
 		return "", nil, fmt.Errorf("%s is a Windows shell; use shell/bash/sh on this OS", kind)
 	default:
