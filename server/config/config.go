@@ -14,6 +14,7 @@ type Config struct {
 	ExtensionsDir  string
 	CertDir        string
 	UpdatesDir     string
+	ModulesDir     string
 	AgentCleartext bool
 }
 
@@ -27,6 +28,7 @@ func Load() (Config, error) {
 		ExtensionsDir:  envOr("LATTICE_EXTENSIONS_DIR", "extensions"),
 		CertDir:        envOr("LATTICE_CERT_DIR", "data/certs"),
 		UpdatesDir:     envOr("LATTICE_UPDATES_DIR", "data/updates"),
+		ModulesDir:     envOr("LATTICE_MODULES_DIR", "data/modules"),
 		AgentCleartext: cleartext,
 	}
 	if cfg.DatabaseURL == "" {

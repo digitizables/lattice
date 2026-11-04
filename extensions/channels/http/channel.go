@@ -54,6 +54,7 @@ func (c *Channel) Start(ctx context.Context, addr string) error {
 	mux.HandleFunc("POST /v1/task_cancel_poll", c.handleTaskCancelPoll)
 	mux.HandleFunc("POST /v1/update/check", c.handleUpdateCheck)
 	mux.HandleFunc("POST /v1/update/download", c.handleUpdateDownload)
+	mux.HandleFunc("POST /v1/module/download", c.handleModuleDownload)
 
 	c.server = &http.Server{
 		Addr:              addr,
@@ -175,6 +176,50 @@ func (c *Channel) handleTaskRunning(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	raw, err := proto.Marshal(&agentv1.AgentTaskRunningResponse{Ok: true, Cancelled: cancelled})
+	if err != nil {
+		http.Error(w, "marshal", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(raw)
+}
+
+func (c *Channel) handleModuleDownload(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var in agentv1.AgentModuleDownload
+	if err := proto.Unmarshal(body, &in); err != nil {
+		http.Error(w, "bad protobuf", http.StatusBadRequest)
+		return
+	}
+	mod, data, err := c.core.DownloadModule(in.GetKind(), in.GetName(), in.GetOs(), in.GetArch(), in.GetVersion())
+	if err != nil {
+		c.log.Error("module download failed", "err", err)
+		http.Error(w, "module download failed", http.StatusNotFound)
+		return
+	}
+	if len(data) > 64<<20 {
+		http.Error(w, "module too large", http.StatusBadRequest)
+		return
+	}
+	out := &agentv1.AgentModuleDownloadResponse{
+		Module: &agentv1.ModuleInfo{
+			Name:        mod.Name,
+			Kind:        mod.Kind,
+			Version:     mod.Version,
+			Os:          mod.OS,
+			Arch:        mod.Arch,
+			Sha256:      mod.SHA256,
+			Size:        mod.Size,
+			DefaultArgs: mod.DefaultArgs,
+			Description: mod.Description,
+		},
+		Data: data,
+	}
+	raw, err := proto.Marshal(out)
 	if err != nil {
 		http.Error(w, "marshal", http.StatusInternalServerError)
 		return

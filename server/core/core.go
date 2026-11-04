@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	agentv1 "github.com/digitizables/lattice/gen/lattice/agent/v1"
+	"github.com/digitizables/lattice/server/modules"
 	"github.com/digitizables/lattice/server/store"
 	"github.com/digitizables/lattice/server/updates"
 )
@@ -16,11 +17,12 @@ type Core struct {
 	store   *store.Store
 	bus     *Bus
 	updates *updates.Store
+	modules *modules.Store
 }
 
-// New wraps a store and optional update catalog.
-func New(s *store.Store, u *updates.Store) *Core {
-	return &Core{store: s, bus: newBus(), updates: u}
+// New wraps a store and optional update/module catalogs.
+func New(s *store.Store, u *updates.Store, m *modules.Store) *Core {
+	return &Core{store: s, bus: newBus(), updates: u, modules: m}
 }
 
 // SubscribeEvents returns a live event feed for operators.
@@ -139,6 +141,30 @@ func (c *Core) ListUpdates() ([]updates.Artifact, error) {
 		return nil, nil
 	}
 	return c.updates.List()
+}
+
+// ListElevateModules returns BYO elevation modules.
+func (c *Core) ListElevateModules() ([]modules.Module, error) {
+	if c.modules == nil {
+		return nil, nil
+	}
+	return c.modules.List(modules.KindElevate)
+}
+
+// DownloadModule returns a published module binary.
+func (c *Core) DownloadModule(kind, name, osName, arch, version string) (modules.Module, []byte, error) {
+	if c.modules == nil {
+		return modules.Module{}, nil, fmt.Errorf("module service not configured")
+	}
+	return c.modules.Get(kind, name, osName, arch, version)
+}
+
+// PublishModule stores an operator-supplied module.
+func (c *Core) PublishModule(m modules.Module, data []byte) (modules.Module, error) {
+	if c.modules == nil {
+		return modules.Module{}, fmt.Errorf("module service not configured")
+	}
+	return c.modules.Publish(m, data)
 }
 
 // HandleTaskResult records an agent task result.

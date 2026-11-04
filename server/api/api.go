@@ -147,6 +147,31 @@ func (s *Server) PublishAgentUpdate(
 	}, nil
 }
 
+func (s *Server) ListElevateModules(
+	_ context.Context,
+	_ *operatorv1.ListElevateModulesRequest,
+) (*operatorv1.ListElevateModulesResponse, error) {
+	list, err := s.core.ListElevateModules()
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err.Error())
+	}
+	out := &operatorv1.ListElevateModulesResponse{}
+	for _, m := range list {
+		out.Modules = append(out.Modules, &operatorv1.ElevateModule{
+			Name:        m.Name,
+			Version:     m.Version,
+			Os:          m.OS,
+			Arch:        m.Arch,
+			Sha256:      m.SHA256,
+			Size:        m.Size,
+			Description: m.Description,
+			DefaultArgs: m.DefaultArgs,
+			PublishedAt: timestamppb.New(m.PublishedAt),
+		})
+	}
+	return out, nil
+}
+
 func storeTaskToUpdated(task store.Task) *operatorv1.TaskUpdated {
 	var exit int32
 	if task.ExitCode != nil {

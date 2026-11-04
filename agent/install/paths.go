@@ -7,7 +7,15 @@ import (
 	"strings"
 )
 
-// ServiceName is the OS service / unit name (override with LATTICE_SERVICE_NAME).
+// Persistence method codenames (see docs/operators/persistence.md).
+const (
+	MethodKeel   = "keel"   // Windows / OS service
+	MethodHarbor = "harbor" // logon scheduled task / systemd user unit
+	MethodSplice = "splice" // HKCU Run / @reboot cron
+	MethodAsh    = "ash"    // full cleanup / remove traces
+)
+
+// ServiceName is the OS service / task / Run value name (override with LATTICE_SERVICE_NAME).
 func ServiceName() string {
 	if v := strings.TrimSpace(os.Getenv("LATTICE_SERVICE_NAME")); v != "" {
 		return v

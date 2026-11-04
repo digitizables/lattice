@@ -14,6 +14,7 @@ service OperatorService {
   rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
   rpc ListAgentUpdates(ListAgentUpdatesRequest) returns (ListAgentUpdatesResponse);
   rpc PublishAgentUpdate(PublishAgentUpdateRequest) returns (PublishAgentUpdateResponse);
+  rpc ListElevateModules(ListElevateModulesRequest) returns (ListElevateModulesResponse);
   rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
 }
 
@@ -99,6 +100,24 @@ message PublishAgentUpdateRequest {
 
 message PublishAgentUpdateResponse {
   AgentUpdate update = 1;
+}
+
+message ListElevateModulesRequest {}
+
+message ListElevateModulesResponse {
+  repeated ElevateModule modules = 1;
+}
+
+message ElevateModule {
+  string name = 1;
+  string version = 2;
+  string os = 3;
+  string arch = 4;
+  string sha256 = 5;
+  uint64 size = 6;
+  string description = 7;
+  repeated string default_args = 8;
+  google.protobuf.Timestamp published_at = 9;
 }
 
 message StreamEventsRequest {

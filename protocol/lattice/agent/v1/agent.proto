@@ -109,3 +109,29 @@ message AgentUpdateDownloadResponse {
   UpdateInfo update = 1;
   bytes data = 2;
 }
+
+message ModuleInfo {
+  string name = 1;
+  string kind = 2;
+  string version = 3;
+  string os = 4;
+  string arch = 5;
+  string sha256 = 6;
+  uint64 size = 7;
+  repeated string default_args = 8;
+  string description = 9;
+}
+
+message AgentModuleDownload {
+  string agent_id = 1;
+  string kind = 2;
+  string name = 3;
+  string os = 4;
+  string arch = 5;
+  string version = 6; // empty = newest
+}
+
+message AgentModuleDownloadResponse {
+  ModuleInfo module = 1;
+  bytes data = 2;
+}

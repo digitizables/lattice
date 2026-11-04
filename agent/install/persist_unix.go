@@ -10,23 +10,27 @@ import (
 	"strings"
 )
 
-// Install registers a systemd user service when possible; otherwise a legacy user crontab @reboot entry.
-func Install(opts Options) error {
+// Install prefers Harbor (systemd user unit), then Splice (@reboot cron).
+// Returns the persistence method codename.
+func Install(opts Options) (string, error) {
 	exe, err := osExecutable()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := ensureDirs(opts); err != nil {
-		return err
+		return "", err
 	}
 	if err := copyFile(exe, BinaryPath()); err != nil {
-		return fmt.Errorf("copy agent binary: %w", err)
+		return "", fmt.Errorf("copy agent binary: %w", err)
 	}
 
 	if err := installSystemdUser(opts); err == nil {
-		return nil
+		return MethodHarbor, nil
 	}
-	return installCronReboot(opts)
+	if err := installCronReboot(opts); err != nil {
+		return "", err
+	}
+	return MethodSplice, nil
 }
 
 func installSystemdUser(opts Options) error {

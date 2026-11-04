@@ -41,20 +41,21 @@ func main() {
 
 	switch cmd {
 	case "install", "persist":
-		if err := install.Install(opts); err != nil {
+		method, err := install.Install(opts)
+		if err != nil {
 			log.Error("install failed", "err", err)
-			fmt.Fprintln(os.Stderr, "hint: service install usually requires an elevated shell")
+			fmt.Fprintln(os.Stderr, "hint: Keel (service) needs elevation; Harbor/Splice are user-level fallbacks")
 			os.Exit(1)
 		}
-		fmt.Printf("installed always-on agent service %q\nbinary: %s\nid-file: %s\n",
-			install.ServiceName(), install.BinaryPath(), *idFile)
+		fmt.Printf("installed persistence method %s (%q)\nbinary: %s\nid-file: %s\n",
+			method, install.ServiceName(), install.BinaryPath(), *idFile)
 		return
 	case "uninstall":
 		if err := install.UninstallService(); err != nil {
 			log.Error("uninstall failed", "err", err)
 			os.Exit(1)
 		}
-		fmt.Printf("removed service %q (use cleanup to wipe files)\n", install.ServiceName())
+		fmt.Printf("removed Keel/Harbor/Splice registration for %q (use cleanup / Ash to wipe files)\n", install.ServiceName())
 		return
 	case "cleanup":
 		res, err := install.Cleanup()
@@ -62,10 +63,10 @@ func main() {
 			fmt.Println(step)
 		}
 		if err != nil {
-			log.Error("cleanup finished with errors", "err", err)
+			log.Error("Ash cleanup finished with errors", "err", err)
 			os.Exit(1)
 		}
-		fmt.Println("cleanup complete")
+		fmt.Println("Ash cleanup complete")
 		os.Exit(0)
 	}
 

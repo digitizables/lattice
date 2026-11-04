@@ -69,6 +69,8 @@ The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-p
 
 Open a session in **Console**, then type commands and press Enter. The shell starts at `C:\` (Windows) or `/` (Unix). Examples: `pwd`, `cd Windows`, `dir`, `powershell Get-Date`. Local helpers: `help`, `clear`, `sessions`, `use <agent_id>`. ↑/↓ history, Ctrl+L clears, **Ctrl+C** cancels a queued or running task.
 
+Persistence method codenames (**Keel**, **Harbor**, **Splice**) and full wipe (**Ash**) are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
+
 ### Always-on agent (recommended)
 
 Install once so the agent stays online across logoff/reboot without a manual terminal:

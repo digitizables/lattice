@@ -39,3 +39,24 @@ func (h *HTTP) DownloadUpdate(ctx context.Context, agentID, goos, arch, version 
 	}, &out)
 	return &out, err
 }
+
+// DownloadModule pulls a published elevate/other module binary.
+func (h *HTTP) DownloadModule(ctx context.Context, agentID, kind, name, goos, arch, version string) (*agentv1.AgentModuleDownloadResponse, error) {
+	prev := h.client
+	h.client = &http.Client{
+		Timeout:   5 * time.Minute,
+		Transport: prev.Transport,
+	}
+	defer func() { h.client = prev }()
+
+	var out agentv1.AgentModuleDownloadResponse
+	err := h.post(ctx, "/v1/module/download", &agentv1.AgentModuleDownload{
+		AgentId: agentID,
+		Kind:    kind,
+		Name:    name,
+		Os:      goos,
+		Arch:    arch,
+		Version: version,
+	}, &out)
+	return &out, err
+}
