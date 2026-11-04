@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { tick } from "svelte";
   import {
     accountName,
     deleteSession,
@@ -7,18 +6,12 @@
     listSessions,
     loadPathDisplay,
     savePathDisplay,
-    submitTaskAndWait,
     userAtHost,
     type PathDisplay,
     type Session,
   } from "./lib/api";
+  import ConsoleView from "./lib/ConsoleView.svelte";
   import DocsView from "./lib/DocsView.svelte";
-  import {
-    dialectForSession,
-    escapeHtml,
-    formatTermOutput,
-    highlightShell,
-  } from "./lib/shellHighlight";
 
   type NavId = "sessions" | "console" | "listeners" | "docs" | "settings";
 
@@ -28,79 +21,29 @@
   let totalCount = $state(0);
   let activeCount = $state(0);
   let nextPageToken = $state("");
-  let pageTokens = $state<string[]>([""]); // tokens to fetch each page; index 0 is first page
+  let pageTokens = $state<string[]>([""]);
   let pageIndex = $state(0);
   let query = $state("");
   let queryInput = $state("");
   let error = $state("");
   let listLoading = $state(false);
-  let taskBusy = $state(false);
   let nav = $state<NavId>("sessions");
   let selectedAgent = $state("");
   let selectedSession = $state<Session | null>(null);
-  let termLines = $state<string[]>([]);
-  let consoleBooted = $state(false);
   let sidebarExpanded = $state(false);
   let pathDisplay = $state<PathDisplay>(loadPathDisplay());
-  let termInput = $state("");
-  let history = $state<string[]>([]);
-  let historyIdx = $state(-1);
-  let termEl: HTMLDivElement | undefined = $state();
-  let inputEl: HTMLInputElement | undefined = $state();
-  let pickerQuery = $state("");
-  let pickerSessions = $state<Session[]>([]);
+  let consoleOpenAgentId = $state<string | null>(null);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
-  let activeAbort: AbortController | null = null;
-  let activeTaskId = $state("");
 
   const selected = $derived(
     selectedSession && selectedSession.agentId === selectedAgent
       ? selectedSession
-      : sessions.find((s) => s.agentId === selectedAgent) ??
-          pickerSessions.find((s) => s.agentId === selectedAgent) ??
-          null,
+      : sessions.find((s) => s.agentId === selectedAgent) ?? null,
   );
-
-  function promptPrefix(agent?: Session | null) {
-    if (!agent) return `<span class="term-prompt">lattice&gt;</span>`;
-    const user = accountName(agent.username, agent.hostname);
-    const path = formatPromptPath(agent.cwd || guessDefaultCwd(agent.os), pathDisplay);
-    const pathHtml = path
-      ? `:<span class="term-path">${escapeHtml(path)}</span>`
-      : "";
-    return `<span class="term-identity">${escapeHtml(user)}</span>@<span class="term-path">${escapeHtml(agent.hostname)}</span>${pathHtml} <span class="term-prompt">$</span>`;
-  }
 
   function guessDefaultCwd(osName?: string): string {
     if ((osName || "").toLowerCase().includes("windows")) return "C:\\";
     return "/";
-  }
-
-  function clearScrollback() {
-    termLines = [];
-    consoleBooted = true;
-  }
-
-  function bootConsoleBanner(_agent?: Session | null) {
-    clearScrollback();
-  }
-
-  function highlightLine(line: string, agent?: Session | null): string {
-    return highlightShell(line, dialectForSession(agent?.os, line));
-  }
-
-  const highlightedInput = $derived(
-    highlightShell(termInput, dialectForSession(selected?.os, termInput)),
-  );
-
-  async function appendTerm(html: string) {
-    termLines = [...termLines, html];
-    await tick();
-    if (termEl) termEl.scrollTop = termEl.scrollHeight;
-  }
-
-  function focusTerminal() {
-    void tick().then(() => inputEl?.focus());
   }
 
   function isOnline(s: Session, now = Date.now()): boolean {
@@ -119,11 +62,8 @@
     if (session) selectSession(session);
     else if (agentId) selectedAgent = agentId;
     nav = "console";
-    if (!consoleBooted) {
-      clearScrollback();
-    }
-    focusTerminal();
-    void loadPicker("");
+    const id = agentId || selectedAgent;
+    if (id) consoleOpenAgentId = id;
   }
 
   function setPathDisplay(mode: PathDisplay) {
@@ -158,7 +98,6 @@
       } else {
         const onPage = sessions.find((s) => s.agentId === selectedAgent);
         if (onPage) selectedSession = onPage;
-        // If the selected session went stale and a live one exists, prefer live.
         if (selectedSession && !isOnline(selectedSession) && fresh) {
           selectSession(fresh);
         }
@@ -182,23 +121,6 @@
     searchTimer = setTimeout(() => applySearch(), 250);
   }
 
-  async function loadPicker(q: string) {
-    try {
-      const res = await listSessions({ pageSize: 30, query: q || undefined });
-      pickerSessions = res.sessions;
-      if (selectedSession && !pickerSessions.some((s) => s.agentId === selectedSession?.agentId)) {
-        pickerSessions = [selectedSession, ...pickerSessions];
-      }
-    } catch {
-      // keep prior picker list
-    }
-  }
-
-  function schedulePickerSearch() {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => void loadPicker(pickerQuery.trim()), 250);
-  }
-
   async function removeSession(agentId: string) {
     error = "";
     try {
@@ -213,135 +135,6 @@
     }
   }
 
-  async function runShellLine(line: string) {
-    if (!selectedAgent) {
-      await appendTerm('<span class="term-err">no session selected — pick one in the console toolbar</span>');
-      return;
-    }
-    if (taskBusy) {
-      await appendTerm('<span class="term-err">^C to cancel the running command</span>');
-      return;
-    }
-
-    taskBusy = true;
-    error = "";
-    const agent = selected;
-    if (agent && !isOnline(agent)) {
-      await appendTerm(
-        '<span class="term-err">session offline (no recent check-in)</span>',
-      );
-    }
-    await appendTerm(`${promptPrefix(agent)} ${highlightLine(line, agent)}`);
-    const ac = new AbortController();
-    activeAbort = ac;
-    activeTaskId = "";
-    try {
-      const result = await submitTaskAndWait(
-        selectedAgent,
-        "shell",
-        [line],
-        undefined,
-        (taskId) => {
-          activeTaskId = taskId;
-        },
-        ac.signal,
-      );
-      if (result.stdout) {
-        await appendTerm(formatTermOutput(result.stdout.replace(/\n$/, "")));
-      }
-      if (result.stderr) {
-        await appendTerm(
-          `<span class="term-err">${formatTermOutput(result.stderr.replace(/\n$/, ""))}</span>`,
-        );
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg === "^C") {
-        await appendTerm('<span class="term-err">^C</span>');
-      } else {
-        await appendTerm(`<span class="term-err">${escapeHtml(msg)}</span>`);
-      }
-    } finally {
-      taskBusy = false;
-      activeAbort = null;
-      activeTaskId = "";
-      focusTerminal();
-    }
-  }
-
-  async function handleCommand(raw: string) {
-    const trimmed = raw.trim();
-    if (!trimmed) return;
-
-    history = [trimmed, ...history.filter((h) => h !== trimmed)].slice(0, 50);
-    historyIdx = -1;
-
-    // Pure terminal emulator: every line goes to the agent's native OS shell.
-    await runShellLine(trimmed);
-    if (selectedAgent) {
-      const res = await listSessions({ pageSize: 5, query: selectedAgent });
-      const updated = res.sessions.find((s) => s.agentId === selectedAgent);
-      if (updated) selectSession(updated);
-    }
-  }
-
-  function interruptTask() {
-    if (!taskBusy || !activeAbort) return;
-    activeAbort.abort();
-    void appendTerm('<span class="term-muted">^C — cancelled</span>');
-  }
-
-  async function onTermKeydown(e: KeyboardEvent) {
-    if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      interruptTask();
-      return;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (taskBusy) return;
-      const value = termInput;
-      termInput = "";
-      await handleCommand(value);
-      return;
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (history.length === 0) return;
-      historyIdx = Math.min(historyIdx + 1, history.length - 1);
-      termInput = history[historyIdx] ?? "";
-      return;
-    }
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (historyIdx <= 0) {
-        historyIdx = -1;
-        termInput = "";
-        return;
-      }
-      historyIdx -= 1;
-      termInput = history[historyIdx] ?? "";
-      return;
-    }
-    if (e.key === "l" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      if (!taskBusy) bootConsoleBanner(selected);
-    }
-  }
-
-  // Ctrl+C must work even while the input would otherwise ignore keys.
-  $effect(() => {
-    if (!taskBusy) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        interruptTask();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  });
-
   $effect(() => {
     void loadPage(0);
   });
@@ -353,15 +146,6 @@
       void loadPage(idx);
     }, 15000);
     return () => clearInterval(id);
-  });
-
-  $effect(() => {
-    if (nav !== "console") return;
-    if (!consoleBooted) {
-      clearScrollback();
-    }
-    focusTerminal();
-    void loadPicker(pickerQuery.trim());
   });
 </script>
 
@@ -539,82 +323,7 @@
             </div>
           </div>
         {:else if nav === "console"}
-          <div class="surface console-surface">
-            <div class="console-toolbar">
-              <div class="agent-picker">
-                <label for="picker-search">Session</label>
-                <input
-                  id="picker-search"
-                  class="search"
-                  placeholder="Filter sessions…"
-                  bind:value={pickerQuery}
-                  oninput={() => schedulePickerSearch()}
-                />
-                <select
-                  bind:value={selectedAgent}
-                  onchange={() => {
-                    const s = pickerSessions.find((x) => x.agentId === selectedAgent);
-                    if (s) {
-                      selectSession(s);
-                      bootConsoleBanner(s);
-                    }
-                    focusTerminal();
-                  }}
-                >
-                  <option value="">Select session…</option>
-                  {#each pickerSessions as s}
-                    <option value={s.agentId}
-                      >{isOnline(s) ? "●" : "○"} {userAtHost(s.username, s.hostname)} · {s.agentId.slice(0, 8)}</option
-                    >
-                  {/each}
-                </select>
-              </div>
-              <button class="ghost-btn" onclick={() => clearScrollback()} title="Clear scrollback (Ctrl+L)"
-                >Clear</button
-              >
-            </div>
-            <div class="terminal-surface fill">
-              <div
-                class="terminal-canvas mono"
-                role="log"
-                tabindex="0"
-                bind:this={termEl}
-                onclick={() => focusTerminal()}
-                onkeydown={(e) => {
-                  if (e.key.length === 1 || e.key === "Enter" || e.key === "Backspace") focusTerminal();
-                }}
-              >
-                {#each termLines as line}
-                  <div class="term-line">{@html line}</div>
-                {/each}
-              </div>
-              <div class="term-input-row mono">
-                <span class="prompt">{@html promptPrefix(selected)}</span>
-                <div class="term-input-wrap">
-                  <div class="term-input-mirror" aria-hidden="true">
-                    {#if termInput}
-                      {@html highlightedInput}
-                    {:else if !taskBusy}
-                      <span class="term-placeholder">command</span>
-                    {:else}
-                      <span class="term-placeholder">waiting — Ctrl+C to cancel</span>
-                    {/if}
-                  </div>
-                  <input
-                    class="term-input"
-                    bind:this={inputEl}
-                    bind:value={termInput}
-                    readonly={taskBusy}
-                    spellcheck="false"
-                    autocomplete="off"
-                    autocapitalize="off"
-                    aria-label="Shell command"
-                    onkeydown={onTermKeydown}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          <ConsoleView pathDisplay={pathDisplay} bind:openAgentId={consoleOpenAgentId} />
         {:else if nav === "listeners"}
           <div class="surface">
             <div class="heading">
@@ -733,7 +442,7 @@
           ><span class="live">●</span>
           {activeCount.toLocaleString()} active session{activeCount === 1 ? "" : "s"}</span
         >
-        <span>↑↓ history · Ctrl+L clear scrollback · Ctrl+C cancel</span>
+        <span>Tabs · split · ↑↓ history · Ctrl+L clear · Ctrl+C cancel</span>
       </footer>
     </section>
   </div>

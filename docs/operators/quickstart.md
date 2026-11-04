@@ -67,7 +67,9 @@ Open http://127.0.0.1:5173. Vite proxies Connect calls to the teamserver on `:80
 
 The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a listeners status view. The **Documentation** sidebar item (book icon, above Settings) renders these operator guides and the developer getting-started doc in-app; switch sets with Operators / Developers.
 
-Open a session in **Console**, then type native OS commands and press Enter. The console is a terminal emulator (no artificial helpers): every line goes to the agent’s native shell. Working directory starts at `C:\` (Windows) or `/` (Unix); `cd` / `pwd` persist across commands. Examples: `dir`, `ls -la`, `cd Windows`, `powershell Get-Date` (Windows only). ↑/↓ history, Ctrl+L clears scrollback, **Ctrl+C** cancels a queued or running command. The input line has shell syntax highlighting.
+Open a session in **Console**, then type native OS commands and press Enter. The console is a terminal emulator (no artificial helpers): every line goes to the agent’s native shell. Working directory starts at `C:\` (Windows) or `/` (Unix); `cd` / `pwd` persist across commands. Examples: `dir`, `ls -la`, `cd Windows`, `powershell Get-Date` (Windows only).
+
+Use **+** for another terminal tab, the split icons for side-by-side or stacked panes inside a tab, and **×** to close a tab or pane. ↑/↓ history, Ctrl+L clears scrollback, **Ctrl+C** cancels a queued or running command. The input line has shell syntax highlighting.
 
 Persistence method codenames (**Keel**, **Harbor**, **Splice**) and full wipe (**Ash**) are documented in [persistence.md](persistence.md). Bring-your-own elevation modules are documented in [elevate.md](elevate.md).
 
