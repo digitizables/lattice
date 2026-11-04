@@ -69,7 +69,7 @@ The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-p
 
 Open a session in **Console**, then type native OS commands and press Enter. The console is a terminal emulator (no artificial helpers): every line goes to the agent’s native shell. Working directory starts at `C:\` (Windows) or `/` (Unix); `cd` / `pwd` persist across commands. Examples: `dir`, `ls -la`, `cd Windows`, `powershell Get-Date` (Windows only).
 
-Use **+** for another terminal tab, the split icons (or right-click a pane → Split right / Split down) for side-by-side or stacked panes, and **×** to close a tab or pane. The browser inspect menu is disabled in the console. ↑/↓ history, Ctrl+L clears scrollback, **Ctrl+C** cancels a queued or running command.
+Use **+** for another terminal tab, right-click a pane → **Split right** / **Split down** for side-by-side or stacked panes, and **×** to close a tab or pane. The browser inspect menu is disabled in the console. ↑/↓ history, Ctrl+L clears scrollback, **Ctrl+C** cancels a queued or running command.
 
 Command input is highlighted with **highlight.js** (bash / PowerShell / DOS). Agent output is rendered with **ansi_up**, so `ls` directory colors and other ANSI SGR sequences show in the console. Unix agents run the shell under a PTY with color-friendly `ls`/`grep` helpers.
 

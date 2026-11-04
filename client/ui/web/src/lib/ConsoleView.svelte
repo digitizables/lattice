@@ -303,32 +303,6 @@
         >
       </button>
     </div>
-    <div class="term-tab-actions">
-      <button
-        type="button"
-        class="ghost-btn icon-btn"
-        class:active={activeTab?.split === "vertical"}
-        title="Split right"
-        aria-label="Split right"
-        onclick={() => splitActive("vertical")}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          ><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M12 3v18" /></svg
-        >
-      </button>
-      <button
-        type="button"
-        class="ghost-btn icon-btn"
-        class:active={activeTab?.split === "horizontal"}
-        title="Split down"
-        aria-label="Split down"
-        onclick={() => splitActive("horizontal")}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          ><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 12h18" /></svg
-        >
-      </button>
-    </div>
   </div>
 
   {#if activeTab}

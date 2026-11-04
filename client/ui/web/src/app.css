@@ -709,14 +709,6 @@ table.sessions tr.selected {
   border-color: var(--border-soft);
 }
 
-.term-tab-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
-  height: var(--tab-h);
-}
-
 .icon-btn {
   display: inline-grid;
   place-items: center;
@@ -724,12 +716,6 @@ table.sessions tr.selected {
   height: var(--tab-h);
   padding: 0;
   border-radius: var(--radius-sm);
-}
-
-.icon-btn.active {
-  color: var(--text);
-  border-color: var(--border);
-  background: var(--bg-elevated);
 }
 
 .term-split {

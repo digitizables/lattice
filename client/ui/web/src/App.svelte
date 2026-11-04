@@ -441,7 +441,7 @@
           ><span class="live">●</span>
           {activeCount.toLocaleString()} active session{activeCount === 1 ? "" : "s"}</span
         >
-        <span>Tabs · split · ↑↓ history · Ctrl+L clear · Ctrl+C cancel</span>
+        <span>↑↓ history · Ctrl+L clear · Ctrl+C cancel · right-click to split</span>
       </footer>
     </section>
   </div>
