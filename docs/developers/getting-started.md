@@ -2,6 +2,8 @@
 
 Get one full path working before anything else: from the operator through the server and HTTP channel to the agent, then back with a result. By then Compose should be up with Postgres, the teamserver, and nginx for the UI.
 
+For the full developer map (architecture, packages, protocol, agent, UI, extensions, data model, Compose, workflow), start at the [developer documentation index](README.md).
+
 ## Progress
 
 - **Protocol** (`protocol/lattice/...`, Buf generate into `gen/`): Done

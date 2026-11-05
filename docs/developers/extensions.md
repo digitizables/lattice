@@ -2,6 +2,8 @@
 
 Lattice discovers channel packages under `extensions/channels/*/manifest.yaml` and starts those that have a matching in-process factory registered at build time (`server/extensions` builtins).
 
+![Extension discover and reload](images/extension-reload.png)
+
 There is no public catalog of Lattice channel packages yet. The install tooling is ready for when packages live in their own repos or release archives.
 
 ## Local directory

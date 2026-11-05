@@ -1,5 +1,16 @@
+import developersAgent from "@docs/developers/agent.md?raw";
+import developersArchitecture from "@docs/developers/architecture.md?raw";
+import developersCompose from "@docs/developers/compose-and-deploy.md?raw";
+import developersDataModel from "@docs/developers/data-model.md?raw";
+import developersDevWorkflow from "@docs/developers/development-workflow.md?raw";
 import developersExtensions from "@docs/developers/extensions.md?raw";
 import developersGettingStarted from "@docs/developers/getting-started.md?raw";
+import developersIndex from "@docs/developers/README.md?raw";
+import developersMonorepo from "@docs/developers/monorepo.md?raw";
+import developersOperatorCli from "@docs/developers/operator-cli.md?raw";
+import developersOperatorUi from "@docs/developers/operator-ui.md?raw";
+import developersProtocol from "@docs/developers/protocol.md?raw";
+import developersTeamserver from "@docs/developers/teamserver.md?raw";
 import operatorsElevate from "@docs/operators/elevate.md?raw";
 import operatorsPersistence from "@docs/operators/persistence.md?raw";
 import operatorsQuickstart from "@docs/operators/quickstart.md?raw";
@@ -54,8 +65,15 @@ export const docSets: DocSet[] = [
   {
     id: "developers",
     label: "Developers",
-    description: "Build order, stack, and how the monorepo fits together.",
+    description: "Architecture, packages, protocols, and how to extend Lattice.",
     docs: [
+      {
+        id: "developers/index",
+        title: "Index",
+        description: "Map of the developer documentation tree.",
+        file: "README.md",
+        markdown: developersIndex,
+      },
       {
         id: "developers/getting-started",
         title: "Getting started",
@@ -64,11 +82,81 @@ export const docSets: DocSet[] = [
         markdown: developersGettingStarted,
       },
       {
+        id: "developers/architecture",
+        title: "Architecture",
+        description: "Deployable units and operator vs agent paths.",
+        file: "architecture.md",
+        markdown: developersArchitecture,
+      },
+      {
+        id: "developers/monorepo",
+        title: "Monorepo layout",
+        description: "Packages and what each directory owns.",
+        file: "monorepo.md",
+        markdown: developersMonorepo,
+      },
+      {
+        id: "developers/protocol",
+        title: "Protocol",
+        description: "Protobuf packages, Connect, and agent HTTP.",
+        file: "protocol.md",
+        markdown: developersProtocol,
+      },
+      {
+        id: "developers/teamserver",
+        title: "Teamserver",
+        description: "Boot path, packages, env, and publishing tools.",
+        file: "teamserver.md",
+        markdown: developersTeamserver,
+      },
+      {
+        id: "developers/agent",
+        title: "Agent",
+        description: "Runtime, shell, persist, update, and elevate.",
+        file: "agent.md",
+        markdown: developersAgent,
+      },
+      {
+        id: "developers/operator-cli",
+        title: "Operator CLI",
+        description: "client sessions, task, listeners, reload.",
+        file: "operator-cli.md",
+        markdown: developersOperatorCli,
+      },
+      {
+        id: "developers/operator-ui",
+        title: "Operator web UI",
+        description: "Svelte console surfaces and conventions.",
+        file: "operator-ui.md",
+        markdown: developersOperatorUi,
+      },
+      {
         id: "developers/extensions",
         title: "Extensions",
-        description: "Channel manifests and local package install.",
+        description: "Channel manifests, install, and reload.",
         file: "extensions.md",
         markdown: developersExtensions,
+      },
+      {
+        id: "developers/data-model",
+        title: "Data model",
+        description: "PostgreSQL agents, tasks, and operators.",
+        file: "data-model.md",
+        markdown: developersDataModel,
+      },
+      {
+        id: "developers/compose-and-deploy",
+        title: "Compose and deploy",
+        description: "Docker images, ports, and lab agent.",
+        file: "compose-and-deploy.md",
+        markdown: developersCompose,
+      },
+      {
+        id: "developers/development-workflow",
+        title: "Development workflow",
+        description: "Proto, tests, make targets, diagram exports.",
+        file: "development-workflow.md",
+        markdown: developersDevWorkflow,
       },
     ],
   },

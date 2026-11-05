@@ -39,7 +39,11 @@ Channel and malleable settings as data files. Generation and listeners consume p
 
 ## Status
 
-Early design. Interfaces and layout may change before a stable release.
+Lab-ready vertical slice: Compose teamserver/web, HTTP(S) agent channel, operator CLI and Svelte console, persistence/update/elevate pipelines, and extension install/reload. See [docs/developers/](docs/developers/) for developer documentation.
+
+## Status note
+
+Interfaces may still change before a tagged stable release.
 
 ## License
 
