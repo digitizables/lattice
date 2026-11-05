@@ -1261,6 +1261,17 @@ table.sessions tr.selected {
   margin-top: 0;
 }
 
+.docs-prose img {
+  display: block;
+  max-width: min(100%, 640px);
+  width: auto;
+  height: auto;
+  margin: var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
 .docs-prose h1,
 .docs-prose h2,
 .docs-prose h3,
