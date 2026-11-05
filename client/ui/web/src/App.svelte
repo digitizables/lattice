@@ -3,11 +3,16 @@
     accountName,
     deleteSession,
     formatPromptPath,
+    listAgentUpdates,
+    listElevateModules,
     listListeners,
     listSessions,
     loadPathDisplay,
+    reloadExtensions,
     savePathDisplay,
     userAtHost,
+    type AgentUpdate,
+    type ElevateModule,
     type Listener,
     type PathDisplay,
     type Session,
@@ -38,6 +43,10 @@
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let listeners = $state<Listener[]>([]);
   let listenersLoading = $state(false);
+  let reloadBusy = $state(false);
+  let agentUpdates = $state<AgentUpdate[]>([]);
+  let elevateModules = $state<ElevateModule[]>([]);
+  let catalogsLoading = $state(false);
 
   const selected = $derived(
     selectedSession && selectedSession.agentId === selectedAgent
@@ -170,6 +179,40 @@
       void loadListeners();
     }, 15000);
     return () => clearInterval(id);
+  });
+
+  async function onReloadExtensions() {
+    reloadBusy = true;
+    error = "";
+    try {
+      const started = await reloadExtensions();
+      await loadListeners();
+      if (started.length === 0) {
+        error = "reload finished with no channels started";
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      reloadBusy = false;
+    }
+  }
+
+  async function loadCatalogs() {
+    catalogsLoading = true;
+    try {
+      const [updates, modules] = await Promise.all([listAgentUpdates(), listElevateModules()]);
+      agentUpdates = updates;
+      elevateModules = modules;
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      catalogsLoading = false;
+    }
+  }
+
+  $effect(() => {
+    if (nav !== "settings") return;
+    void loadCatalogs();
   });
 </script>
 
@@ -358,6 +401,11 @@
                   {/if}
                 </p>
               </div>
+              <div class="heading-actions">
+                <button class="ghost-btn" disabled={reloadBusy} onclick={() => onReloadExtensions()}
+                  >{reloadBusy ? "Reloading…" : "Reload extensions"}</button
+                >
+              </div>
             </div>
             <div class="pane-body grow flush">
               {#if listeners.length === 0}
@@ -469,6 +517,79 @@
                     <span class="settings-v mono">https://127.0.0.1:8443</span>
                   </div>
                 </div>
+              </section>
+
+              <section class="settings-section">
+                <header class="settings-section-head">
+                  <h3>Agent updates</h3>
+                  <p>
+                    Published binaries agents can pull with <span class="mono">update</span>. Publish with
+                    <span class="mono">publish-agent</span>.
+                    {#if catalogsLoading}<span class="muted"> Loading…</span>{/if}
+                  </p>
+                </header>
+                {#if agentUpdates.length === 0}
+                  <p class="muted">No updates in the catalog.</p>
+                {:else}
+                  <table class="sessions catalog-table">
+                    <thead>
+                      <tr>
+                        <th>Version</th>
+                        <th>OS</th>
+                        <th>Arch</th>
+                        <th>Size</th>
+                        <th>SHA-256</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each agentUpdates as u (`${u.version}-${u.os}-${u.arch}`)}
+                        <tr>
+                          <td class="mono">{u.version}</td>
+                          <td>{u.os}</td>
+                          <td>{u.arch}</td>
+                          <td class="mono">{u.size.toLocaleString()}</td>
+                          <td class="mono">{u.sha256.slice(0, 12)}…</td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                {/if}
+              </section>
+
+              <section class="settings-section">
+                <header class="settings-section-head">
+                  <h3>Elevation modules</h3>
+                  <p>
+                    BYO modules tasked with <span class="mono">elevate &lt;name&gt;</span>. Publish with
+                    <span class="mono">publish-module</span>.
+                  </p>
+                </header>
+                {#if elevateModules.length === 0}
+                  <p class="muted">No elevation modules in the catalog.</p>
+                {:else}
+                  <table class="sessions catalog-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Version</th>
+                        <th>OS</th>
+                        <th>Arch</th>
+                        <th>Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each elevateModules as m (`${m.name}-${m.version}-${m.os}-${m.arch}`)}
+                        <tr>
+                          <td class="mono">{m.name}</td>
+                          <td class="mono">{m.version}</td>
+                          <td>{m.os}</td>
+                          <td>{m.arch}</td>
+                          <td>{m.description || "—"}</td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                {/if}
               </section>
             </div>
           </div>

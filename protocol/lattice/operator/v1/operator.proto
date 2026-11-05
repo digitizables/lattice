@@ -13,6 +13,7 @@ service OperatorService {
   rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
   rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
   rpc ListListeners(ListListenersRequest) returns (ListListenersResponse);
+  rpc ReloadExtensions(ReloadExtensionsRequest) returns (ReloadExtensionsResponse);
   rpc ListAgentUpdates(ListAgentUpdatesRequest) returns (ListAgentUpdatesResponse);
   rpc PublishAgentUpdate(PublishAgentUpdateRequest) returns (PublishAgentUpdateResponse);
   rpc ListElevateModules(ListElevateModulesRequest) returns (ListElevateModulesResponse);
@@ -92,6 +93,12 @@ message Listener {
   bool tls = 4;
   string status = 5;
   string version = 6;
+}
+
+message ReloadExtensionsRequest {}
+
+message ReloadExtensionsResponse {
+  repeated string started = 1;
 }
 
 message ListAgentUpdatesRequest {}

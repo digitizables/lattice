@@ -101,6 +101,15 @@ func (m *Manager) List() []Info {
 	return out
 }
 
+// Reset drops registered channel implementations. Call after StopAll before
+// rediscovering manifests for a hot reload.
+func (m *Manager) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.channels = make(map[string]Channel)
+	m.running = make(map[string]running)
+}
+
 // Stop halts a running channel.
 func (m *Manager) Stop(ctx context.Context, name string) error {
 	m.mu.Lock()

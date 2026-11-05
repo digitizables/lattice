@@ -10,6 +10,7 @@ import (
 	operatorv1 "github.com/digitizables/lattice/gen/lattice/operator/v1"
 	"github.com/digitizables/lattice/gen/lattice/operator/v1/operatorv1connect"
 	"github.com/digitizables/lattice/server/core"
+	"github.com/digitizables/lattice/server/extensions"
 	"github.com/digitizables/lattice/server/listen"
 	"github.com/digitizables/lattice/server/store"
 )
@@ -18,15 +19,16 @@ import (
 type Server struct {
 	core *core.Core
 	mgr  *listen.Manager
+	ext  *extensions.Runtime
 	log  *slog.Logger
 }
 
-// New returns an OperatorService handler wired to core and listeners.
-func New(c *core.Core, mgr *listen.Manager, log *slog.Logger) *Server {
+// New returns an OperatorService handler wired to core, listeners, and extensions.
+func New(c *core.Core, mgr *listen.Manager, ext *extensions.Runtime, log *slog.Logger) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{core: c, mgr: mgr, log: log}
+	return &Server{core: c, mgr: mgr, ext: ext, log: log}
 }
 
 // Register mounts the operator service on a Connect server.
@@ -127,6 +129,20 @@ func (s *Server) ListListeners(
 		})
 	}
 	return out, nil
+}
+
+func (s *Server) ReloadExtensions(
+	ctx context.Context,
+	_ *operatorv1.ReloadExtensionsRequest,
+) (*operatorv1.ReloadExtensionsResponse, error) {
+	if s.ext == nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "extension runtime not configured")
+	}
+	started, err := s.ext.Reload(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err.Error())
+	}
+	return &operatorv1.ReloadExtensionsResponse{Started: started}, nil
 }
 
 func (s *Server) ListAgentUpdates(

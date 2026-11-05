@@ -14,8 +14,10 @@ Get one full path working before anything else: from the operator through the se
 - **Scale**: Cursor pagination, server-side search, agent indexes, check-in events only on new sessions
 - **Extension loader**: Done (manifest discover + builtin channel factories)
 - **Extension install**: Done for local dirs, zip/tar.gz (`-url`), and GitHub zipballs (`-github owner/repo[@ref]`)
+- **Extension hot-reload**: Done (`ReloadExtensions` / `client reload-extensions` / Listeners UI button)
 - **Web UI**: Done (Vite + Svelte under `client/ui/web`; also served via Compose `web` on `:3000`)
 - **Compose teamserver/web images**: Done (`packager/docker/docker-compose.yml`)
+- **E2E smoke**: Done (`LATTICE_E2E=1 go test -tags e2e ./test/e2e`)
 
 ### Lab run (Compose)
 
@@ -115,5 +117,8 @@ go mod tidy
 - [x] Compose `teamserver` / `web` images build and run
 - [x] Local extension package install (`install-extension -src`)
 - [x] Remote extension install from GitHub zipball or release archive (`-github` / `-url`)
+- [x] Hot-reload extensions without process restart
+- [x] E2E smoke tests against a live stack
+- [x] Settings catalogs for agent updates and elevate modules
 
 Operator docs go in `docs/operators/`. Extension notes: [extensions.md](extensions.md).

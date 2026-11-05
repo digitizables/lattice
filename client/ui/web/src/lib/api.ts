@@ -226,6 +226,59 @@ export async function listListeners(): Promise<Listener[]> {
   }));
 }
 
+export async function reloadExtensions(): Promise<string[]> {
+  const data = await connectUnary<Record<string, never>, { started?: string[] }>("ReloadExtensions", {});
+  return data.started ?? [];
+}
+
+export type AgentUpdate = {
+  version: string;
+  os: string;
+  arch: string;
+  sha256: string;
+  size: number;
+};
+
+export async function listAgentUpdates(): Promise<AgentUpdate[]> {
+  const data = await connectUnary<Record<string, never>, { updates?: Record<string, unknown>[] }>(
+    "ListAgentUpdates",
+    {},
+  );
+  return ((data.updates as Record<string, unknown>[] | undefined) ?? []).map((raw) => ({
+    version: String(raw.version ?? ""),
+    os: String(raw.os ?? ""),
+    arch: String(raw.arch ?? ""),
+    sha256: String(raw.sha256 ?? ""),
+    size: Number(raw.size ?? 0),
+  }));
+}
+
+export type ElevateModule = {
+  name: string;
+  version: string;
+  os: string;
+  arch: string;
+  sha256: string;
+  size: number;
+  description: string;
+};
+
+export async function listElevateModules(): Promise<ElevateModule[]> {
+  const data = await connectUnary<Record<string, never>, { modules?: Record<string, unknown>[] }>(
+    "ListElevateModules",
+    {},
+  );
+  return ((data.modules as Record<string, unknown>[] | undefined) ?? []).map((raw) => ({
+    name: String(raw.name ?? ""),
+    version: String(raw.version ?? ""),
+    os: String(raw.os ?? ""),
+    arch: String(raw.arch ?? ""),
+    sha256: String(raw.sha256 ?? ""),
+    size: Number(raw.size ?? 0),
+    description: String(raw.description ?? ""),
+  }));
+}
+
 /**
  * Submit a task, then poll GetTask until the agent finishes.
  * Pass AbortSignal (Ctrl+C) to cancel remotely and stop waiting.

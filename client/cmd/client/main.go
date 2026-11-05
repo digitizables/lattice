@@ -29,6 +29,33 @@ func main() {
 	)
 
 	switch os.Args[1] {
+	case "listeners":
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		res, err := rpc.ListListeners(ctx, &operatorv1.ListListenersRequest{})
+		if err != nil {
+			fail(err)
+		}
+		if len(res.GetListeners()) == 0 {
+			fmt.Println("no listeners")
+			return
+		}
+		for _, l := range res.GetListeners() {
+			tls := "off"
+			if l.GetTls() {
+				tls = "on"
+			}
+			fmt.Printf("%s  %s  bind=%s  tls=%s  status=%s  version=%s\n",
+				l.GetName(), l.GetKind(), l.GetBind(), tls, l.GetStatus(), l.GetVersion())
+		}
+	case "reload-extensions":
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		res, err := rpc.ReloadExtensions(ctx, &operatorv1.ReloadExtensionsRequest{})
+		if err != nil {
+			fail(err)
+		}
+		fmt.Printf("started=%v\n", res.GetStarted())
 	case "sessions":
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

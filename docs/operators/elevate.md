@@ -35,7 +35,7 @@ elevate my-uac
 elevate my-uac --flag value
 ```
 
-List what the catalog has (operator API): `ListElevateModules`.
+List what the catalog has in **Settings → Elevation modules**, or via the operator API `ListElevateModules`.
 
 ## Lab example
 

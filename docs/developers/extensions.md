@@ -37,7 +37,13 @@ go run ./server/cmd/install-extension -github owner/repo -ref develop -subdir ch
 
 Set `LATTICE_EXTENSIONS_DIR` or pass `-extensions-dir` to choose the install root. The tool replaces `extensions/channels/<name>`.
 
-Restart the teamserver after install. **Builtin factory registration is still required** for the channel to start; out-of-process / WASM loading is not implemented yet.
+After install, reload channels without a full process restart:
+
+```text
+go run ./client/cmd/client reload-extensions
+```
+
+Or use **Reload extensions** on the Listeners page. **Builtin factory registration is still required** for a new channel name to start; out-of-process / WASM loading is not implemented yet.
 
 ## Manifest fields
 
@@ -45,6 +51,5 @@ See `extensions/channels/http/manifest.yaml` for the current shape (`name`, `kin
 
 ## Still open
 
-- Hot-reload without process restart
 - Out-of-process / WASM channel runtimes
 - A published registry of community channel packages

@@ -97,6 +97,7 @@ func main() {
 
 	loader := extensions.New(log)
 	extensions.RegisterBuiltins(loader)
+	extRuntime := extensions.NewRuntime(log, loader, mgr, deps, cfg.ExtensionsDir, cfg.AgentAddr)
 	manifests, err := loader.Discover(cfg.ExtensionsDir)
 	if err != nil {
 		log.Error("discover extensions", "err", err)
@@ -108,7 +109,7 @@ func main() {
 	}
 
 	connectServer := connect.NewServer()
-	api.New(c, mgr, log).Register(connectServer)
+	api.New(c, mgr, extRuntime, log).Register(connectServer)
 
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, connectServer)
