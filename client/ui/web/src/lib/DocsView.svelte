@@ -26,6 +26,7 @@
 
   let docSetId = $state<DocSetId>(loadSet());
   let docId = $state(loadDocId(loadSet()));
+  let lightbox = $state<{ src: string; alt: string } | null>(null);
 
   const currentSet = $derived(findDocSet(docSetId));
   const currentDoc = $derived(findDoc(docSetId, docId));
@@ -37,16 +38,36 @@
     const next = findDocSet(id).docs[0]?.id ?? "";
     docId = next;
     localStorage.setItem(DOC_ID_KEY, next);
+    lightbox = null;
   }
 
   function selectDoc(id: string) {
     docId = id;
     localStorage.setItem(DOC_ID_KEY, id);
+    lightbox = null;
+  }
+
+  function openLightbox(img: HTMLImageElement) {
+    lightbox = {
+      src: img.currentSrc || img.src,
+      alt: img.alt || "Documentation figure",
+    };
+  }
+
+  function closeLightbox() {
+    lightbox = null;
   }
 
   function onArticleClick(e: MouseEvent) {
     const t = e.target;
     if (!(t instanceof Element)) return;
+
+    if (t instanceof HTMLImageElement) {
+      e.preventDefault();
+      openLightbox(t);
+      return;
+    }
+
     const a = t.closest("a");
     if (!a) return;
     const href = a.getAttribute("href");
@@ -59,6 +80,18 @@
       selectDoc(linked.id);
     }
   }
+
+  $effect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeLightbox();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 </script>
 
 <div class="surface docs-surface">
@@ -112,3 +145,27 @@
     </article>
   </div>
 </div>
+
+{#if lightbox}
+  <div
+    class="docs-lightbox"
+    role="dialog"
+    aria-modal="true"
+    aria-label={lightbox.alt}
+    tabindex="-1"
+    onclick={(e) => {
+      if (e.currentTarget === e.target) closeLightbox();
+    }}
+    onkeydown={(e) => {
+      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        closeLightbox();
+      }
+    }}
+  >
+    <button type="button" class="docs-lightbox-close ghost-btn" onclick={closeLightbox} aria-label="Close image"
+      >Close</button
+    >
+    <img class="docs-lightbox-img" src={lightbox.src} alt={lightbox.alt} />
+  </div>
+{/if}
