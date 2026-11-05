@@ -1,5 +1,5 @@
-// install-extension copies a local channel package into the extensions tree.
-// Remote GitHub install is not implemented yet.
+// install-extension copies a channel package into the extensions tree from a
+// local directory, a local/remote archive, or a GitHub repository zipball.
 package main
 
 import (
@@ -11,14 +11,47 @@ import (
 )
 
 func main() {
-	src := flag.String("src", "", "path to a channel package directory containing manifest.yaml")
+	src := flag.String("src", "", "local channel package directory containing manifest.yaml")
+	url := flag.String("url", "", "https archive URL, or local .zip/.tar.gz path")
+	github := flag.String("github", "", "owner/repo or owner/repo@ref (downloads GitHub zipball)")
+	ref := flag.String("ref", "", "git ref for -github when @ref is omitted (default main)")
+	subdir := flag.String("subdir", "", "path inside the archive to the channel package")
 	dir := flag.String("extensions-dir", envOr("LATTICE_EXTENSIONS_DIR", "extensions"), "extensions root")
 	flag.Parse()
-	if *src == "" {
-		fmt.Fprintln(os.Stderr, "usage: install-extension -src ./path/to/channel")
+
+	n := 0
+	if *src != "" {
+		n++
+	}
+	if *url != "" {
+		n++
+	}
+	if *github != "" {
+		n++
+	}
+	if n != 1 {
+		fmt.Fprintln(os.Stderr, "usage:")
+		fmt.Fprintln(os.Stderr, "  install-extension -src ./path/to/channel")
+		fmt.Fprintln(os.Stderr, "  install-extension -url https://example.com/channel.zip [-subdir path]")
+		fmt.Fprintln(os.Stderr, "  install-extension -github owner/repo[@ref] [-subdir path] [-ref main]")
 		os.Exit(2)
 	}
-	dst, err := extensions.InstallLocalChannel(*dir, *src)
+
+	var (
+		dst string
+		err error
+	)
+	switch {
+	case *src != "":
+		dst, err = extensions.InstallLocalChannel(*dir, *src)
+	default:
+		dst, err = extensions.InstallRemoteChannel(*dir, extensions.RemoteOptions{
+			URL:    *url,
+			GitHub: *github,
+			Ref:    *ref,
+			Subdir: *subdir,
+		})
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "install-extension: %v\n", err)
 		os.Exit(1)

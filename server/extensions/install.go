@@ -10,7 +10,6 @@ import (
 
 // InstallLocalChannel copies a channel package directory into
 // extensionsDir/channels/<name>. The source must contain manifest.yaml.
-// Remote GitHub install is not implemented yet; use a local checkout or archive extract.
 func InstallLocalChannel(extensionsDir, srcDir string) (string, error) {
 	srcDir = filepath.Clean(srcDir)
 	manifestPath := filepath.Join(srcDir, "manifest.yaml")

@@ -13,7 +13,7 @@ Get one full path working before anything else: from the operator through the se
 - **Connect API + CLI**: Done (`sessions` paginated/searchable, `task` waits on `StreamEvents`)
 - **Scale**: Cursor pagination, server-side search, agent indexes, check-in events only on new sessions
 - **Extension loader**: Done (manifest discover + builtin channel factories)
-- **Local extension install**: Done (`go run ./server/cmd/install-extension -src …`); remote GitHub install still pending
+- **Extension install**: Done for local dirs, zip/tar.gz (`-url`), and GitHub zipballs (`-github owner/repo[@ref]`)
 - **Web UI**: Done (Vite + Svelte under `client/ui/web`; also served via Compose `web` on `:3000`)
 - **Compose teamserver/web images**: Done (`packager/docker/docker-compose.yml`)
 
@@ -113,7 +113,7 @@ go mod tidy
 - [x] End-to-end check-in + task against live Postgres (`whoami` / `echo` completed in DB)
 - [x] HTTP channel loads through the extension loader from `extensions/channels/http/manifest.yaml`
 - [x] Compose `teamserver` / `web` images build and run
-- [x] Local extension package install (`install-extension`)
-- [ ] Remote extension install from GitHub or a release archive
+- [x] Local extension package install (`install-extension -src`)
+- [x] Remote extension install from GitHub zipball or release archive (`-github` / `-url`)
 
 Operator docs go in `docs/operators/`. Extension notes: [extensions.md](extensions.md).
