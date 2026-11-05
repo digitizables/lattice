@@ -202,6 +202,30 @@ export async function cancelTask(taskId: string): Promise<boolean> {
   return Boolean(data.cancelled);
 }
 
+export type Listener = {
+  name: string;
+  kind: string;
+  bind: string;
+  tls: boolean;
+  status: string;
+  version: string;
+};
+
+export async function listListeners(): Promise<Listener[]> {
+  const data = await connectUnary<Record<string, never>, { listeners?: Record<string, unknown>[] }>(
+    "ListListeners",
+    {},
+  );
+  return ((data.listeners as Record<string, unknown>[] | undefined) ?? []).map((raw) => ({
+    name: String(raw.name ?? ""),
+    kind: String(raw.kind ?? ""),
+    bind: String(raw.bind ?? ""),
+    tls: Boolean(raw.tls),
+    status: String(raw.status ?? ""),
+    version: String(raw.version ?? ""),
+  }));
+}
+
 /**
  * Submit a task, then poll GetTask until the agent finishes.
  * Pass AbortSignal (Ctrl+C) to cancel remotely and stop waiting.

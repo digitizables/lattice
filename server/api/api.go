@@ -10,21 +10,23 @@ import (
 	operatorv1 "github.com/digitizables/lattice/gen/lattice/operator/v1"
 	"github.com/digitizables/lattice/gen/lattice/operator/v1/operatorv1connect"
 	"github.com/digitizables/lattice/server/core"
+	"github.com/digitizables/lattice/server/listen"
 	"github.com/digitizables/lattice/server/store"
 )
 
 // Server implements OperatorService.
 type Server struct {
 	core *core.Core
+	mgr  *listen.Manager
 	log  *slog.Logger
 }
 
-// New returns an OperatorService handler wired to core.
-func New(c *core.Core, log *slog.Logger) *Server {
+// New returns an OperatorService handler wired to core and listeners.
+func New(c *core.Core, mgr *listen.Manager, log *slog.Logger) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{core: c, log: log}
+	return &Server{core: c, mgr: mgr, log: log}
 }
 
 // Register mounts the operator service on a Connect server.
@@ -104,6 +106,27 @@ func (s *Server) CancelTask(
 		return nil, connect.NewError(connect.CodeInternal, err.Error())
 	}
 	return &operatorv1.CancelTaskResponse{Cancelled: ok}, nil
+}
+
+func (s *Server) ListListeners(
+	_ context.Context,
+	_ *operatorv1.ListListenersRequest,
+) (*operatorv1.ListListenersResponse, error) {
+	out := &operatorv1.ListListenersResponse{}
+	if s.mgr == nil {
+		return out, nil
+	}
+	for _, info := range s.mgr.List() {
+		out.Listeners = append(out.Listeners, &operatorv1.Listener{
+			Name:    info.Name,
+			Kind:    info.Kind,
+			Bind:    info.Addr,
+			Tls:     info.TLS,
+			Status:  info.Status,
+			Version: info.Version,
+		})
+	}
+	return out, nil
 }
 
 func (s *Server) ListAgentUpdates(

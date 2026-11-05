@@ -3,10 +3,12 @@
     accountName,
     deleteSession,
     formatPromptPath,
+    listListeners,
     listSessions,
     loadPathDisplay,
     savePathDisplay,
     userAtHost,
+    type Listener,
     type PathDisplay,
     type Session,
   } from "./lib/api";
@@ -34,6 +36,8 @@
   let pathDisplay = $state<PathDisplay>(loadPathDisplay());
   let consoleOpenAgentId = $state<string | null>(null);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let listeners = $state<Listener[]>([]);
+  let listenersLoading = $state(false);
 
   const selected = $derived(
     selectedSession && selectedSession.agentId === selectedAgent
@@ -144,6 +148,26 @@
     const idx = pageIndex;
     const id = setInterval(() => {
       void loadPage(idx);
+    }, 15000);
+    return () => clearInterval(id);
+  });
+
+  async function loadListeners() {
+    listenersLoading = true;
+    try {
+      listeners = await listListeners();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      listenersLoading = false;
+    }
+  }
+
+  $effect(() => {
+    if (nav !== "listeners") return;
+    void loadListeners();
+    const id = setInterval(() => {
+      void loadListeners();
     }, 15000);
     return () => clearInterval(id);
   });
@@ -326,28 +350,49 @@
             <div class="heading">
               <div>
                 <h2>Listeners</h2>
-                <p>Channels started by the teamserver extension loader.</p>
+                <p>
+                  {#if listenersLoading && listeners.length === 0}
+                    Loading channels…
+                  {:else}
+                    {listeners.length} running channel{listeners.length === 1 ? "" : "s"} from the extension loader.
+                  {/if}
+                </p>
               </div>
             </div>
-            <div class="pane-body flush">
-              <table class="sessions">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Kind</th>
-                    <th>Bind</th>
-                    <th>TLS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td class="mono">http</td>
-                    <td>channel</td>
-                    <td class="mono">:8443</td>
-                    <td>on</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="pane-body grow flush">
+              {#if listeners.length === 0}
+                <div class="empty">
+                  <strong>No listeners</strong>
+                  <span>Start the teamserver so channel manifests can bind.</span>
+                </div>
+              {:else}
+                <table class="sessions">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Kind</th>
+                      <th>Bind</th>
+                      <th>TLS</th>
+                      <th>Status</th>
+                      <th>Version</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each listeners as l (l.name)}
+                      <tr>
+                        <td class="mono">{l.name}</td>
+                        <td>{l.kind}</td>
+                        <td class="mono">{l.bind}</td>
+                        <td>{l.tls ? "on" : "off"}</td>
+                        <td>
+                          <span class="pill" class:online={l.status === "running"}>{l.status || "unknown"}</span>
+                        </td>
+                        <td class="mono">{l.version || "—"}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {/if}
             </div>
           </div>
         {:else if nav === "docs"}

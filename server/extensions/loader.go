@@ -111,7 +111,15 @@ func (l *Loader) StartChannels(
 		if addr == "" {
 			addr = defaultAddr
 		}
-		if err := mgr.Start(ctx, m.Name, addr); err != nil {
+		info := listen.Info{
+			Name:    m.Name,
+			Kind:    "channel",
+			Addr:    addr,
+			Version: m.Version,
+			TLS:     !deps.Cleartext,
+			Status:  "running",
+		}
+		if err := mgr.Start(ctx, m.Name, addr, info); err != nil {
 			return started, fmt.Errorf("start channel %q: %w", m.Name, err)
 		}
 		l.log.Info("channel started", "name", m.Name, "addr", addr, "version", m.Version)

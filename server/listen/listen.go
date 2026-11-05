@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 )
 
@@ -14,18 +15,33 @@ type Channel interface {
 	Stop(ctx context.Context) error
 }
 
+// Info is a running (or known) listener snapshot for operators.
+type Info struct {
+	Name    string
+	Kind    string
+	Addr    string
+	Version string
+	TLS     bool
+	Status  string // running
+}
+
+type running struct {
+	ch   Channel
+	info Info
+}
+
 // Manager starts and stops registered channels.
 type Manager struct {
 	mu       sync.Mutex
 	channels map[string]Channel
-	running  map[string]Channel
+	running  map[string]running
 }
 
 // NewManager returns an empty listener manager.
 func NewManager() *Manager {
 	return &Manager{
 		channels: make(map[string]Channel),
-		running:  make(map[string]Channel),
+		running:  make(map[string]running),
 	}
 }
 
@@ -36,8 +52,8 @@ func (m *Manager) Register(ch Channel) {
 	m.channels[ch.Name()] = ch
 }
 
-// Start runs a registered channel on addr.
-func (m *Manager) Start(ctx context.Context, name, addr string) error {
+// Start runs a registered channel on addr and records operator-facing metadata.
+func (m *Manager) Start(ctx context.Context, name, addr string, info Info) error {
 	m.mu.Lock()
 	ch, ok := m.channels[name]
 	if !ok {
@@ -54,23 +70,48 @@ func (m *Manager) Start(ctx context.Context, name, addr string) error {
 		return err
 	}
 
+	if info.Name == "" {
+		info.Name = name
+	}
+	if info.Kind == "" {
+		info.Kind = "channel"
+	}
+	if info.Addr == "" {
+		info.Addr = addr
+	}
+	if info.Status == "" {
+		info.Status = "running"
+	}
+
 	m.mu.Lock()
-	m.running[name] = ch
+	m.running[name] = running{ch: ch, info: info}
 	m.mu.Unlock()
 	return nil
+}
+
+// List returns running listeners sorted by name.
+func (m *Manager) List() []Info {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]Info, 0, len(m.running))
+	for _, r := range m.running {
+		out = append(out, r.info)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // Stop halts a running channel.
 func (m *Manager) Stop(ctx context.Context, name string) error {
 	m.mu.Lock()
-	ch, ok := m.running[name]
+	r, ok := m.running[name]
 	if !ok {
 		m.mu.Unlock()
 		return fmt.Errorf("channel %q is not running", name)
 	}
 	delete(m.running, name)
 	m.mu.Unlock()
-	return ch.Stop(ctx)
+	return r.ch.Stop(ctx)
 }
 
 // StopAll stops every running channel.

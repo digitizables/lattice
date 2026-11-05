@@ -108,7 +108,7 @@ func main() {
 	}
 
 	connectServer := connect.NewServer()
-	api.New(c, log).Register(connectServer)
+	api.New(c, mgr, log).Register(connectServer)
 
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, connectServer)

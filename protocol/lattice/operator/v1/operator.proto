@@ -12,6 +12,7 @@ service OperatorService {
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
   rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+  rpc ListListeners(ListListenersRequest) returns (ListListenersResponse);
   rpc ListAgentUpdates(ListAgentUpdatesRequest) returns (ListAgentUpdatesResponse);
   rpc PublishAgentUpdate(PublishAgentUpdateRequest) returns (PublishAgentUpdateResponse);
   rpc ListElevateModules(ListElevateModulesRequest) returns (ListElevateModulesResponse);
@@ -76,6 +77,21 @@ message CancelTaskRequest {
 
 message CancelTaskResponse {
   bool cancelled = 1;
+}
+
+message ListListenersRequest {}
+
+message ListListenersResponse {
+  repeated Listener listeners = 1;
+}
+
+message Listener {
+  string name = 1;
+  string kind = 2;
+  string bind = 3;
+  bool tls = 4;
+  string status = 5;
+  string version = 6;
 }
 
 message ListAgentUpdatesRequest {}
