@@ -18,6 +18,7 @@
     loadPathDisplay,
     login,
     logout,
+    operatorApiBase,
     reloadExtensions,
     savePathDisplay,
     setAgentSleep,
@@ -97,6 +98,21 @@
       : sessions.find((s) => s.agentId === selectedAgent) ?? null,
   );
 
+  // Settings prompt preview mirrors the console: selected session, else idle lattice>
+  const previewSession = $derived(
+    selected ?? sessions.find((s) => isOnline(s)) ?? sessions[0] ?? null,
+  );
+
+  const apiBase = operatorApiBase();
+  const agentChannelPreview = $derived.by(() => {
+    const http = listeners.find((l) => l.name === "http");
+    if (!http?.bind) return "";
+    const scheme = http.tls ? "https" : "http";
+    // bind is often ":8443"; show a usable lab URL.
+    const hostPort = http.bind.startsWith(":") ? `127.0.0.1${http.bind}` : http.bind;
+    return `${scheme}://${hostPort}`;
+  });
+
   function guessDefaultCwd(osName?: string): string {
     if ((osName || "").toLowerCase().includes("windows")) return "C:\\";
     return "/";
@@ -125,6 +141,11 @@
   function setPathDisplay(mode: PathDisplay) {
     pathDisplay = mode;
     savePathDisplay(mode);
+  }
+
+  function promptPathFor(session: Session | null | undefined): string {
+    if (!session) return "";
+    return formatPromptPath(session.cwd || guessDefaultCwd(session.os), pathDisplay);
   }
 
   function handleAuthError(e: unknown): boolean {
@@ -866,19 +887,27 @@
                 <div class="settings-preview">
                   <div class="settings-preview-label">Prompt preview</div>
                   <div class="settings-preview-box mono">
-                    <span class="term-identity"
-                      >{accountName(selected?.username || "user", selected?.hostname || "host")}</span
-                    >@<span class="term-path">{selected?.hostname || "host"}</span>:<span class="term-path"
-                      >{formatPromptPath(selected?.cwd || guessDefaultCwd(selected?.os), pathDisplay) ||
-                        guessDefaultCwd(selected?.os)}</span
-                    >
-                    <span class="term-prompt"> $</span>
+                    {#if previewSession}
+                      {@const path = promptPathFor(previewSession)}
+                      <span class="term-identity"
+                        >{accountName(previewSession.username, previewSession.hostname)}</span
+                      >@<span class="term-path">{previewSession.hostname}</span
+                      >{#if path}:<span class="term-path">{path}</span>{/if}
+                      <span class="term-prompt"> $</span>
+                    {:else}
+                      <span class="term-prompt">lattice&gt;</span>
+                    {/if}
                   </div>
                   <div class="settings-preview-meta">
-                    {#if pathDisplay === "full"}
-                      Example: <span class="mono">C:\Users\Paul Beck</span>
+                    {#if previewSession}
+                      Live from {userAtHost(previewSession.username, previewSession.hostname)}
+                      {#if selected?.agentId === previewSession.agentId}
+                        (selected session)
+                      {:else}
+                        (first available session)
+                      {/if}
                     {:else}
-                      Example: <span class="mono">Paul Beck</span> (last path segment)
+                      No session yet — same idle prompt as an empty console pane.
                     {/if}
                   </div>
                 </div>
@@ -887,16 +916,18 @@
               <section class="settings-section">
                 <header class="settings-section-head">
                   <h3>Connection</h3>
-                  <p>Where this UI talks to Lattice. Read-only in the lab build.</p>
+                  <p>Where this UI talks to Lattice. API base from the lab build; agent URL from live listeners.</p>
                 </header>
                 <div class="settings-kv">
                   <div>
                     <span class="settings-k">Operator API</span>
-                    <span class="settings-v mono">http://127.0.0.1:8080</span>
+                    <span class="settings-v mono">{apiBase}</span>
                   </div>
                   <div>
                     <span class="settings-k">Agent channel</span>
-                    <span class="settings-v mono">https://127.0.0.1:8443</span>
+                    <span class="settings-v mono"
+                      >{agentChannelPreview || "No http listener reported yet"}</span
+                    >
                   </div>
                 </div>
               </section>

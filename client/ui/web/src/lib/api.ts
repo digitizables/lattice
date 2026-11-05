@@ -110,9 +110,11 @@ export class AuthRequiredError extends Error {
 
 // Talk to the teamserver directly in lab/dev. Vite's proxy breaks Connect streams
 // and can surface as browser "Failed to fetch" while waiting on tasks.
-const servicePrefix =
-  (import.meta.env.VITE_API_BASE?.replace(/\/$/, "") || "http://127.0.0.1:8080") +
-  "/lattice.operator.v1.OperatorService";
+export function operatorApiBase(): string {
+  return import.meta.env.VITE_API_BASE?.replace(/\/$/, "") || "http://127.0.0.1:8080";
+}
+
+const servicePrefix = operatorApiBase() + "/lattice.operator.v1.OperatorService";
 
 function authHeaders(): Record<string, string> {
   const token = loadOperatorToken();
