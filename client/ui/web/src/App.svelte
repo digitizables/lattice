@@ -67,6 +67,8 @@
   let loginBusy = $state(false);
   let loginError = $state("");
   let operatorName = $state("");
+  // Bumped on logout so in-flight listSessions cannot flip the login gate off.
+  let authEpoch = $state(0);
 
   let noteDrafts = $state<Record<string, string>>({});
   let sleepEditId = $state("");
@@ -154,17 +156,21 @@
 
   async function onLogout() {
     error = "";
-    try {
-      await logout();
-    } catch {
-      clearOperatorToken();
-    }
+    // Flip the gate immediately so a late loadPage cannot undo logout.
+    authEpoch += 1;
     operatorName = "";
     authRequired = true;
     sessions = [];
     totalCount = 0;
     activeCount = 0;
     lootItems = [];
+    lootTotal = 0;
+    try {
+      await logout();
+    } catch {
+      clearOperatorToken();
+    }
+    authRequired = true;
   }
 
   function sleepLabel(s: Session): string {
@@ -231,6 +237,8 @@
   }
 
   async function loadPage(index: number) {
+    if (authRequired) return;
+    const epoch = authEpoch;
     listLoading = true;
     error = "";
     try {
@@ -240,7 +248,7 @@
         pageToken: token || undefined,
         query: query || undefined,
       });
-      authRequired = false;
+      if (epoch !== authEpoch || authRequired) return;
       sessions = res.sessions;
       totalCount = res.totalCount;
       activeCount = res.activeCount;
@@ -263,10 +271,11 @@
         }
       }
     } catch (e) {
+      if (epoch !== authEpoch) return;
       if (handleAuthError(e)) return;
       error = e instanceof Error ? e.message : String(e);
     } finally {
-      listLoading = false;
+      if (epoch === authEpoch) listLoading = false;
     }
   }
 

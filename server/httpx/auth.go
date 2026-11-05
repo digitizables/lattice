@@ -30,5 +30,9 @@ func WithOperatorAuth(next http.Handler, a *auth.Auth) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+		// Revoke after Logout succeeds. Connect handlers do not reliably see *http.Request.
+		if strings.HasSuffix(path, "/Logout") {
+			a.Logout(tok)
+		}
 	})
 }

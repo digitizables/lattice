@@ -267,10 +267,24 @@ export async function login(username: string, password: string): Promise<{
 }
 
 export async function logout(): Promise<void> {
+  // Snapshot then clear locally first so the UI can flip to the login gate
+  // even if Logout is missing (old teamserver) or the network stalls.
+  const token = loadOperatorToken();
+  clearOperatorToken();
+  if (!token) return;
   try {
-    await connectUnary<Record<string, never>, Record<string, never>>("Logout", {});
-  } finally {
-    clearOperatorToken();
+    const res = await fetch(`${servicePrefix}/Logout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Connect-Protocol-Version": "1",
+        Authorization: `Bearer ${token}`,
+      },
+      body: "{}",
+    });
+    void res;
+  } catch {
+    // Best-effort revoke; local session is already cleared.
   }
 }
 
