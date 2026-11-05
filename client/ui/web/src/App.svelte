@@ -251,7 +251,6 @@
                     if (e.key === "Enter") applySearch();
                   }}
                 />
-                <button class="ghost-btn" onclick={() => loadPage(pageIndex)} disabled={listLoading}>Refresh</button>
               </div>
             </div>
             <div class="pane-body grow flush">
