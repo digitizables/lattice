@@ -12,12 +12,14 @@ This tree is the developer source of truth. Operator-facing runbooks live under 
 - [Protocol](protocol.md) — Protobuf, Connect, agent HTTP channel
 - [Teamserver](teamserver.md) — config, store, core, API, listen, updates, modules
 - [Agent](agent.md) — identity, transport, shell, persist, cleanup, update, elevate
+- [Custom agents](custom-agents.md) — third-party implant contract (Protobuf + token)
 - [Operator CLI](operator-cli.md) — `client` commands
 - [Operator web UI](operator-ui.md) — Svelte console
-- [Extensions](extensions.md) — manifests, install, reload
+- [Extensions](extensions.md) — manifests, install, and reload
 - [Data model](data-model.md) — PostgreSQL schema
 - [Compose and deploy](compose-and-deploy.md) — Docker images and lab agent
 - [Development workflow](development-workflow.md) — proto, tests, publishing artifacts
+- [Product roadmap](roadmap.md) — Done / Next / Later tracker
 
 ## Diagrams
 

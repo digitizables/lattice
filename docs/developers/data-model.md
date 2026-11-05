@@ -20,7 +20,11 @@ Live streaming updates `stdout`/`stderr` while `status = running`.
 
 ### `operators`
 
-Reserved for future operator auth (`username`, `password_hash`). Not wired into the UI yet.
+Console login accounts (`username`, `password_hash`). Bootstrapped on first start when empty (`LATTICE_BOOTSTRAP_*`; default **admin** / **lattice-change-me**). Bearer sessions live in teamserver memory (not this table). The web UI stores the token in `localStorage` (`lattice.operator.token`) and sends `Authorization: Bearer` on OperatorService calls.
+
+### `loot`
+
+Files uploaded by agents (`download` task) or staged for `upload`: metadata in Postgres, bytes under `LATTICE_LOOT_DIR`.
 
 ## Indexes
 

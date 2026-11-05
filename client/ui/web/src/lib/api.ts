@@ -6,11 +6,20 @@ export type Session = {
   arch: string;
   cwd?: string;
   lastSeen?: string;
+  note?: string;
+  sleepSeconds?: number;
+  jitterPercent?: number;
+  features?: string[];
+  ops?: string[];
+  desiredSleepSeconds?: number;
+  desiredJitterPercent?: number;
+  hasDesiredSleep?: boolean;
 };
 
 export type PathDisplay = "full" | "partial";
 
 const PATH_DISPLAY_KEY = "lattice.terminal.pathDisplay";
+const TOKEN_KEY = "lattice.operator.token";
 
 export function loadPathDisplay(): PathDisplay {
   const v = localStorage.getItem(PATH_DISPLAY_KEY);
@@ -19,6 +28,19 @@ export function loadPathDisplay(): PathDisplay {
 
 export function savePathDisplay(mode: PathDisplay) {
   localStorage.setItem(PATH_DISPLAY_KEY, mode);
+}
+
+export function loadOperatorToken(): string {
+  return localStorage.getItem(TOKEN_KEY) ?? "";
+}
+
+export function saveOperatorToken(token: string) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+export function clearOperatorToken() {
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 /** Format host cwd for the prompt. */
@@ -79,11 +101,24 @@ export type ListSessionsResult = {
   activeCount: number;
 };
 
+export class AuthRequiredError extends Error {
+  constructor(message = "unauthorized") {
+    super(message);
+    this.name = "AuthRequiredError";
+  }
+}
+
 // Talk to the teamserver directly in lab/dev. Vite's proxy breaks Connect streams
 // and can surface as browser "Failed to fetch" while waiting on tasks.
 const servicePrefix =
   (import.meta.env.VITE_API_BASE?.replace(/\/$/, "") || "http://127.0.0.1:8080") +
   "/lattice.operator.v1.OperatorService";
+
+function authHeaders(): Record<string, string> {
+  const token = loadOperatorToken();
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
 
 async function connectUnary<TReq extends object, TRes>(
   method: string,
@@ -96,6 +131,7 @@ async function connectUnary<TReq extends object, TRes>(
       headers: {
         "Content-Type": "application/json",
         "Connect-Protocol-Version": "1",
+        ...authHeaders(),
       },
       body: JSON.stringify(body),
     });
@@ -105,6 +141,13 @@ async function connectUnary<TReq extends object, TRes>(
     );
   }
   const text = await res.text();
+  if (res.status === 401) {
+    // Login itself returns 401 for bad credentials; do not treat as session expiry.
+    if (method === "Login") {
+      throw new Error(formatConnectError(text, "unauthorized"));
+    }
+    throw new AuthRequiredError(formatConnectError(text, "unauthorized"));
+  }
   if (!res.ok) {
     throw new Error(formatConnectError(text, res.statusText));
   }
@@ -120,6 +163,20 @@ function formatConnectError(body: string, fallback: string): string {
     // not JSON
   }
   return body;
+}
+
+function asNumber(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function asStringList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x ?? "")).filter(Boolean);
 }
 
 function mapSession(raw: Record<string, unknown>): Session {
@@ -138,6 +195,14 @@ function mapSession(raw: Record<string, unknown>): Session {
     arch: String(raw.arch ?? ""),
     cwd: String(raw.cwd ?? ""),
     lastSeen: lastSeenOut,
+    note: String(raw.note ?? ""),
+    sleepSeconds: asNumber(raw.sleepSeconds),
+    jitterPercent: asNumber(raw.jitterPercent),
+    features: asStringList(raw.features),
+    ops: asStringList(raw.ops),
+    desiredSleepSeconds: asNumber(raw.desiredSleepSeconds),
+    desiredJitterPercent: asNumber(raw.desiredJitterPercent),
+    hasDesiredSleep: Boolean(raw.hasDesiredSleep),
   };
 }
 
@@ -150,6 +215,63 @@ function mapTask(raw: Record<string, unknown>): TaskUpdated {
     stderr: String(raw.stderr ?? ""),
     exitCode: Number(raw.exitCode ?? raw.exit_code ?? 0),
   };
+}
+
+/** ProtoJSON encodes bytes as standard base64. */
+export function bytesFromJson(data: unknown): Uint8Array {
+  if (data == null || data === "") return new Uint8Array();
+  if (data instanceof Uint8Array) return data;
+  if (typeof data === "string") {
+    const bin = atob(data);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  if (Array.isArray(data)) return Uint8Array.from(data.map((n) => Number(n) & 0xff));
+  return new Uint8Array();
+}
+
+export function downloadBytes(
+  data: Uint8Array,
+  filename: string,
+  mime = "application/octet-stream",
+) {
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  const blob = new Blob([copy], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function login(username: string, password: string): Promise<{
+  accessToken: string;
+  username: string;
+  expiresInSeconds: number;
+}> {
+  const data = await connectUnary<
+    { username: string; password: string },
+    { accessToken?: string; username?: string; expiresInSeconds?: string | number }
+  >("Login", { username, password });
+  const accessToken = String(data.accessToken ?? "");
+  if (!accessToken) throw new Error("login returned no token");
+  saveOperatorToken(accessToken);
+  return {
+    accessToken,
+    username: String(data.username ?? username),
+    expiresInSeconds: asNumber(data.expiresInSeconds),
+  };
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await connectUnary<Record<string, never>, Record<string, never>>("Logout", {});
+  } finally {
+    clearOperatorToken();
+  }
 }
 
 export async function listSessions(params: ListSessionsParams = {}): Promise<ListSessionsResult> {
@@ -193,6 +315,30 @@ export async function getTask(taskId: string): Promise<TaskUpdated> {
 
 export async function deleteSession(agentId: string): Promise<void> {
   await connectUnary<{ agentId: string }, Record<string, never>>("DeleteSession", { agentId });
+}
+
+export async function setSessionNote(agentId: string, note: string): Promise<Session> {
+  const data = await connectUnary<
+    { agentId: string; note: string },
+    { session?: Record<string, unknown> }
+  >("SetSessionNote", { agentId, note });
+  return mapSession(data.session ?? { agentId, note });
+}
+
+export async function setAgentSleep(
+  agentId: string,
+  sleepSeconds: number,
+  jitterPercent: number,
+): Promise<Session> {
+  const data = await connectUnary<
+    { agentId: string; sleepSeconds: number; jitterPercent: number },
+    { session?: Record<string, unknown> }
+  >("SetAgentSleep", {
+    agentId,
+    sleepSeconds,
+    jitterPercent,
+  });
+  return mapSession(data.session ?? { agentId, sleepSeconds, jitterPercent });
 }
 
 export async function cancelTask(taskId: string): Promise<boolean> {
@@ -277,6 +423,126 @@ export async function listElevateModules(): Promise<ElevateModule[]> {
     size: Number(raw.size ?? 0),
     description: String(raw.description ?? ""),
   }));
+}
+
+export type LootItem = {
+  lootId: string;
+  agentId: string;
+  name: string;
+  remotePath: string;
+  contentType: string;
+  size: number;
+  sha256: string;
+  taskId: string;
+  createdAt?: string;
+};
+
+function mapLoot(raw: Record<string, unknown>): LootItem {
+  const createdAt = raw.createdAt as { seconds?: string | number } | string | undefined;
+  let createdOut: string | undefined;
+  if (typeof createdAt === "string") {
+    createdOut = createdAt;
+  } else if (createdAt && typeof createdAt === "object" && createdAt.seconds != null) {
+    createdOut = new Date(Number(createdAt.seconds) * 1000).toISOString();
+  }
+  return {
+    lootId: String(raw.lootId ?? ""),
+    agentId: String(raw.agentId ?? ""),
+    name: String(raw.name ?? ""),
+    remotePath: String(raw.remotePath ?? ""),
+    contentType: String(raw.contentType ?? ""),
+    size: asNumber(raw.size),
+    sha256: String(raw.sha256 ?? ""),
+    taskId: String(raw.taskId ?? ""),
+    createdAt: createdOut,
+  };
+}
+
+export type ListLootResult = {
+  items: LootItem[];
+  nextPageToken: string;
+  totalCount: number;
+};
+
+export async function listLoot(params: {
+  agentId?: string;
+  pageSize?: number;
+  pageToken?: string;
+} = {}): Promise<ListLootResult> {
+  const body: Record<string, unknown> = {
+    pageSize: params.pageSize ?? 50,
+  };
+  if (params.agentId) body.agentId = params.agentId;
+  if (params.pageToken) body.pageToken = params.pageToken;
+  const data = await connectUnary<Record<string, unknown>, Record<string, unknown>>("ListLoot", body);
+  return {
+    items: ((data.items as Record<string, unknown>[] | undefined) ?? []).map(mapLoot),
+    nextPageToken: String(data.nextPageToken ?? ""),
+    totalCount: Number(data.totalCount ?? 0),
+  };
+}
+
+export async function getLoot(
+  lootId: string,
+  includeData = false,
+): Promise<{ item: LootItem; data: Uint8Array }> {
+  const data = await connectUnary<
+    { lootId: string; includeData: boolean },
+    { item?: Record<string, unknown>; data?: unknown }
+  >("GetLoot", { lootId, includeData });
+  return {
+    item: mapLoot(data.item ?? { lootId }),
+    data: includeData ? bytesFromJson(data.data) : new Uint8Array(),
+  };
+}
+
+export async function deleteLoot(lootId: string): Promise<void> {
+  await connectUnary<{ lootId: string }, Record<string, never>>("DeleteLoot", { lootId });
+}
+
+export type GenerateAgentParams = {
+  serverUrl: string;
+  os: string;
+  arch: string;
+  sleepSeconds: number;
+  jitterPercent: number;
+  insecureTls: boolean;
+  embedAgentToken: boolean;
+  outputName?: string;
+};
+
+export type GenerateAgentResult = {
+  path: string;
+  os: string;
+  arch: string;
+  size: number;
+  sha256: string;
+  data: Uint8Array;
+};
+
+export async function generateAgent(params: GenerateAgentParams): Promise<GenerateAgentResult> {
+  const body: Record<string, unknown> = {
+    serverUrl: params.serverUrl,
+    os: params.os,
+    arch: params.arch,
+    sleepSeconds: params.sleepSeconds,
+    jitterPercent: params.jitterPercent,
+    insecureTls: params.insecureTls,
+    embedAgentToken: params.embedAgentToken,
+  };
+  if (params.outputName) body.outputName = params.outputName;
+  const data = await connectUnary<Record<string, unknown>, Record<string, unknown>>(
+    "GenerateAgent",
+    body,
+  );
+  return {
+    path: String(data.path ?? ""),
+    os: String(data.os ?? params.os),
+    arch: String(data.arch ?? params.arch),
+    size: asNumber(data.size),
+    sha256: String(data.sha256 ?? ""),
+    data: bytesFromJson(data.data),
+  };
 }
 
 /**

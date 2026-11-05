@@ -9,6 +9,7 @@ import (
 
 	operatorv1 "github.com/digitizables/lattice/gen/lattice/operator/v1"
 	"github.com/digitizables/lattice/gen/lattice/operator/v1/operatorv1connect"
+	"github.com/digitizables/lattice/server/auth"
 	"github.com/digitizables/lattice/server/core"
 	"github.com/digitizables/lattice/server/extensions"
 	"github.com/digitizables/lattice/server/listen"
@@ -17,18 +18,39 @@ import (
 
 // Server implements OperatorService.
 type Server struct {
-	core *core.Core
-	mgr  *listen.Manager
-	ext  *extensions.Runtime
-	log  *slog.Logger
+	core         *core.Core
+	mgr          *listen.Manager
+	ext          *extensions.Runtime
+	auth         *auth.Auth
+	agentToken   string
+	generatedDir string
+	moduleRoot   string
+	log          *slog.Logger
+}
+
+// Options configures the operator API server.
+type Options struct {
+	Auth         *auth.Auth
+	AgentToken   string
+	GeneratedDir string
+	ModuleRoot   string
 }
 
 // New returns an OperatorService handler wired to core, listeners, and extensions.
-func New(c *core.Core, mgr *listen.Manager, ext *extensions.Runtime, log *slog.Logger) *Server {
+func New(c *core.Core, mgr *listen.Manager, ext *extensions.Runtime, log *slog.Logger, opts Options) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Server{core: c, mgr: mgr, ext: ext, log: log}
+	return &Server{
+		core:         c,
+		mgr:          mgr,
+		ext:          ext,
+		auth:         opts.Auth,
+		agentToken:   opts.AgentToken,
+		generatedDir: opts.GeneratedDir,
+		moduleRoot:   opts.ModuleRoot,
+		log:          log,
+	}
 }
 
 // Register mounts the operator service on a Connect server.
@@ -274,13 +296,21 @@ func (s *Server) StreamEvents(
 
 func agentToSession(a store.Agent) *operatorv1.Session {
 	return &operatorv1.Session{
-		AgentId:  a.ID,
-		Hostname: a.Hostname,
-		Username: a.Username,
-		Os:       a.OS,
-		Arch:     a.Arch,
-		LastSeen: timestamppb.New(a.LastSeen),
-		Cwd:      a.Cwd,
+		AgentId:              a.ID,
+		Hostname:             a.Hostname,
+		Username:             a.Username,
+		Os:                   a.OS,
+		Arch:                 a.Arch,
+		LastSeen:             timestamppb.New(a.LastSeen),
+		Cwd:                  a.Cwd,
+		Note:                 a.Note,
+		SleepSeconds:         a.SleepSeconds,
+		JitterPercent:        a.JitterPercent,
+		Features:             a.Features,
+		Ops:                  a.Ops,
+		DesiredSleepSeconds:  a.DesiredSleepSeconds,
+		DesiredJitterPercent: a.DesiredJitterPercent,
+		HasDesiredSleep:      a.HasDesiredSleep,
 	}
 }
 

@@ -258,7 +258,17 @@ func (a *Agent) runTask(ctx context.Context, t *agentv1.Task) (exitCode int32, s
 			return 1, "", err.Error()
 		}
 		return 0, next, ""
-	case "shell", "run", "cmd", "powershell", "ps", "pwsh", "bash", "sh":
+	case "ps":
+		return runBuiltinPS()
+	case "ls", "dir":
+		return a.runBuiltinLS(args)
+	case "cat", "type":
+		return a.runBuiltinCat(args)
+	case "download":
+		return a.runBuiltinDownload(ctx, taskID, args)
+	case "upload":
+		return a.runBuiltinUpload(ctx, args)
+	case "shell", "run", "cmd", "powershell", "pwsh", "bash", "sh":
 		line := commandLine("", args)
 		if name == "shell" || name == "run" || name == "" {
 			kind, command := classifyShellLine(line)

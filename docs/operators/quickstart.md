@@ -67,7 +67,14 @@ npm run dev
 
 **Dev UI:** http://127.0.0.1:5173 (`npm run dev` in `client/ui/web`). Vite proxies Connect calls to the teamserver on `:8080`.
 
-The UI uses a Secret-style shell: title bar, icon sidebar, sessions list, full-page console, and a **Listeners** view fed by `ListListeners` (live channel name, bind, TLS, status, version). The **Documentation** sidebar item (book icon, above Settings) renders these operator guides and the developer docs in-app; switch sets with Operators / Developers.
+Operator auth is **on by default**. The SPA shows a login form on HTTP 401 and stores the bearer token in `localStorage` (`lattice.operator.token`). Default bootstrap credentials:
+
+- **Username:** `admin`
+- **Password:** `lattice-change-me`
+
+Change `LATTICE_BOOTSTRAP_PASSWORD` before any real use. Set `LATTICE_AUTH_DISABLED=true` only for an open lab (Login still works and issues a lab token).
+
+The UI uses a Secret-style shell: title bar, icon sidebar, sessions list (notes, sleep/jitter, feature chips), full-page console, and a **Listeners** view fed by `ListListeners` (live channel name, bind, TLS, status, version). **Settings** covers terminal prefs, logout, generate-agent download, loot, and catalogs. The **Documentation** sidebar item (book icon, above Settings) renders these operator guides and the developer docs in-app; switch sets with Operators / Developers.
 
 Open a session in **Console**, then type native OS commands and press Enter. The console is a terminal emulator (no artificial helpers): every line goes to the agent’s native shell. Working directory starts at `C:\` (Windows) or `/` (Unix); `cd` / `pwd` persist across commands. Examples: `dir`, `ls -la`, `cd Windows`, `powershell Get-Date` (Windows only).
 

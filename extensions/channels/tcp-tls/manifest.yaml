@@ -1,0 +1,9 @@
+name: tcp-tls
+kind: channel
+version: 0.1.0
+enabled: true
+bind_addr: ":8444"
+protocol:
+  min: lattice.agent.v1
+description: Length-prefixed agent Protobuf over TLS TCP (remix of reverse TCP hubs).
+entrypoint: channel.go

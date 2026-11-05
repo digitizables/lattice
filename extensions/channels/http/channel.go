@@ -56,6 +56,8 @@ func (c *Channel) Start(ctx context.Context, addr string) error {
 	mux.HandleFunc("POST /v1/update/check", c.handleUpdateCheck)
 	mux.HandleFunc("POST /v1/update/download", c.handleUpdateDownload)
 	mux.HandleFunc("POST /v1/module/download", c.handleModuleDownload)
+	mux.HandleFunc("POST /v1/loot/upload", c.handleLootUpload)
+	mux.HandleFunc("POST /v1/loot/download", c.handleLootDownload)
 
 	c.server = &http.Server{
 		Addr:              addr,
@@ -125,6 +127,10 @@ func (c *Channel) handleCheckIn(w http.ResponseWriter, r *http.Request) {
 	out, err := c.core.HandleCheckIn(r.Context(), &in)
 	if err != nil {
 		c.log.Error("check-in failed", "err", err)
+		if err.Error() == "invalid agent token" {
+			http.Error(w, "invalid agent token", http.StatusUnauthorized)
+			return
+		}
 		http.Error(w, "check-in failed", http.StatusInternalServerError)
 		return
 	}
@@ -338,6 +344,66 @@ func (c *Channel) handleTaskOutput(w http.ResponseWriter, r *http.Request) {
 		cancelled, _ = c.core.IsTaskCancelled(r.Context(), in.GetAgentId(), in.GetTaskId())
 	}
 	raw, err := proto.Marshal(&agentv1.AgentTaskOutputResponse{Accepted: true, Cancelled: cancelled})
+	if err != nil {
+		http.Error(w, "marshal", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(raw)
+}
+
+func (c *Channel) handleLootUpload(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 40<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var in agentv1.AgentLootUpload
+	if err := proto.Unmarshal(body, &in); err != nil {
+		http.Error(w, "bad protobuf", http.StatusBadRequest)
+		return
+	}
+	out, err := c.core.HandleLootUpload(r.Context(), &in)
+	if err != nil {
+		c.log.Error("loot upload failed", "err", err)
+		if err.Error() == "invalid agent token" {
+			http.Error(w, "invalid agent token", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "loot upload failed", http.StatusBadRequest)
+		return
+	}
+	raw, err := proto.Marshal(out)
+	if err != nil {
+		http.Error(w, "marshal", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(raw)
+}
+
+func (c *Channel) handleLootDownload(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var in agentv1.AgentLootDownload
+	if err := proto.Unmarshal(body, &in); err != nil {
+		http.Error(w, "bad protobuf", http.StatusBadRequest)
+		return
+	}
+	out, err := c.core.HandleLootDownload(r.Context(), &in)
+	if err != nil {
+		c.log.Error("loot download failed", "err", err)
+		if err.Error() == "invalid agent token" {
+			http.Error(w, "invalid agent token", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "loot download failed", http.StatusBadRequest)
+		return
+	}
+	raw, err := proto.Marshal(out)
 	if err != nil {
 		http.Error(w, "marshal", http.StatusInternalServerError)
 		return

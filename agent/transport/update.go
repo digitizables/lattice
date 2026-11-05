@@ -16,6 +16,7 @@ func (h *HTTP) CheckUpdate(ctx context.Context, agentID, goos, arch, current str
 		Os:             goos,
 		Arch:           arch,
 		CurrentVersion: current,
+		AgentToken:     h.Token,
 	}, &out)
 	return &out, err
 }
@@ -32,10 +33,11 @@ func (h *HTTP) DownloadUpdate(ctx context.Context, agentID, goos, arch, version 
 
 	var out agentv1.AgentUpdateDownloadResponse
 	err := h.post(ctx, "/v1/update/download", &agentv1.AgentUpdateDownload{
-		AgentId: agentID,
-		Os:      goos,
-		Arch:    arch,
-		Version: version,
+		AgentId:    agentID,
+		Os:         goos,
+		Arch:       arch,
+		Version:    version,
+		AgentToken: h.Token,
 	}, &out)
 	return &out, err
 }
@@ -51,12 +53,13 @@ func (h *HTTP) DownloadModule(ctx context.Context, agentID, kind, name, goos, ar
 
 	var out agentv1.AgentModuleDownloadResponse
 	err := h.post(ctx, "/v1/module/download", &agentv1.AgentModuleDownload{
-		AgentId: agentID,
-		Kind:    kind,
-		Name:    name,
-		Os:      goos,
-		Arch:    arch,
-		Version: version,
+		AgentId:    agentID,
+		Kind:       kind,
+		Name:       name,
+		Os:         goos,
+		Arch:       arch,
+		Version:    version,
+		AgentToken: h.Token,
 	}, &out)
 	return &out, err
 }

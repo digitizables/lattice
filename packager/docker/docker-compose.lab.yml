@@ -24,6 +24,8 @@ services:
         "-insecure",
         "-sleep",
         "2s",
+        "-token",
+        "lattice-lab-agent-token",
         "-id-file",
         "/var/lib/lattice/agent.id",
       ]

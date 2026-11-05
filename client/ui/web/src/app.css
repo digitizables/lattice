@@ -591,6 +591,149 @@ table.sessions tr.selected {
   color: var(--text);
 }
 
+.login-gate {
+  min-height: 100%;
+}
+
+.login-body {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  padding: var(--space-6) var(--page-pad-x);
+}
+
+.login-form {
+  width: min(420px, 100%);
+  display: grid;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: var(--space-5);
+}
+
+.login-form .settings-field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  margin-bottom: 0;
+}
+
+.login-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.login-submit {
+  justify-self: start;
+}
+
+.login-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.note-input {
+  width: 100%;
+  min-width: 8rem;
+  max-width: 14rem;
+  height: var(--control-h-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0 var(--space-2);
+  font-size: 12px;
+}
+
+.note-input:hover,
+.note-input:focus {
+  border-color: var(--border-soft);
+  background: var(--bg-input);
+  color: var(--text);
+  outline: none;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.chip,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: #1f1f1f;
+  white-space: nowrap;
+}
+
+.pill.online {
+  color: var(--ok);
+  border-color: #2f4f3f;
+}
+
+.muted-chip {
+  color: var(--text-muted);
+}
+
+.sleep-edit-row td {
+  background: #1a1a1a;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.sleep-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.sleep-edit label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sleep-edit .login-input {
+  width: 7rem;
+}
+
+.gen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.gen-field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  margin-bottom: 0;
+  justify-content: flex-start;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-height: var(--control-h);
+}
+
+.check-row input {
+  accent-color: var(--accent);
+}
+
 .empty {
   height: 100%;
   min-height: 220px;

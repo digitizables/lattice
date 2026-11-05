@@ -24,6 +24,7 @@ func TestSmokeCheckInAndWhoami(t *testing.T) {
 	}
 	base := envOr("LATTICE_API_URL", "http://127.0.0.1:8080")
 	client := &http.Client{Timeout: 30 * time.Second}
+	token := mustLogin(t, client, base)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -36,7 +37,7 @@ func TestSmokeCheckInAndWhoami(t *testing.T) {
 			t.Fatal(ctx.Err())
 		default:
 		}
-		sessions, err := listSessions(client, base)
+		sessions, err := listSessions(client, base, token)
 		if err != nil {
 			t.Logf("list sessions: %v", err)
 			time.Sleep(2 * time.Second)
@@ -53,7 +54,7 @@ func TestSmokeCheckInAndWhoami(t *testing.T) {
 	}
 	t.Logf("using agent %s", agentID)
 
-	taskID, err := submitTask(client, base, agentID, "whoami", nil)
+	taskID, err := submitTask(client, base, token, agentID, "whoami", nil)
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestSmokeCheckInAndWhoami(t *testing.T) {
 
 	var stdout string
 	for i := 0; i < 60; i++ {
-		task, err := getTask(client, base, taskID)
+		task, err := getTask(client, base, token, taskID)
 		if err != nil {
 			t.Fatalf("get task: %v", err)
 		}
@@ -90,7 +91,8 @@ func TestSmokeListListeners(t *testing.T) {
 	}
 	base := envOr("LATTICE_API_URL", "http://127.0.0.1:8080")
 	client := &http.Client{Timeout: 15 * time.Second}
-	listeners, err := listListeners(client, base)
+	token := mustLogin(t, client, base)
+	listeners, err := listListeners(client, base, token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,27 +130,47 @@ type listenerDTO struct {
 	Status string `json:"status"`
 }
 
-func listSessions(client *http.Client, base string) ([]sessionDTO, error) {
+func mustLogin(t *testing.T, client *http.Client, base string) string {
+	t.Helper()
+	user := envOr("LATTICE_BOOTSTRAP_OPERATOR", "admin")
+	pass := envOr("LATTICE_BOOTSTRAP_PASSWORD", "lattice-change-me")
+	var out struct {
+		AccessToken string `json:"accessToken"`
+	}
+	err := postJSON(client, base+"/lattice.operator.v1.OperatorService/Login", map[string]any{
+		"username": user,
+		"password": pass,
+	}, "", &out)
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if out.AccessToken == "" {
+		t.Fatal("empty access token")
+	}
+	return out.AccessToken
+}
+
+func listSessions(client *http.Client, base, token string) ([]sessionDTO, error) {
 	var out struct {
 		Sessions []sessionDTO `json:"sessions"`
 	}
-	if err := postJSON(client, base+"/lattice.operator.v1.OperatorService/ListSessions", map[string]any{"pageSize": 20}, &out); err != nil {
+	if err := postJSON(client, base+"/lattice.operator.v1.OperatorService/ListSessions", map[string]any{"pageSize": 20}, token, &out); err != nil {
 		return nil, err
 	}
 	return out.Sessions, nil
 }
 
-func listListeners(client *http.Client, base string) ([]listenerDTO, error) {
+func listListeners(client *http.Client, base, token string) ([]listenerDTO, error) {
 	var out struct {
 		Listeners []listenerDTO `json:"listeners"`
 	}
-	if err := postJSON(client, base+"/lattice.operator.v1.OperatorService/ListListeners", map[string]any{}, &out); err != nil {
+	if err := postJSON(client, base+"/lattice.operator.v1.OperatorService/ListListeners", map[string]any{}, token, &out); err != nil {
 		return nil, err
 	}
 	return out.Listeners, nil
 }
 
-func submitTask(client *http.Client, base, agentID, name string, args []string) (string, error) {
+func submitTask(client *http.Client, base, token, agentID, name string, args []string) (string, error) {
 	if args == nil {
 		args = []string{}
 	}
@@ -159,19 +181,19 @@ func submitTask(client *http.Client, base, agentID, name string, args []string) 
 		"agentId": agentID,
 		"name":    name,
 		"args":    args,
-	}, &out)
+	}, token, &out)
 	return out.TaskID, err
 }
 
-func getTask(client *http.Client, base, taskID string) (taskDTO, error) {
+func getTask(client *http.Client, base, token, taskID string) (taskDTO, error) {
 	var out struct {
 		Task taskDTO `json:"task"`
 	}
-	err := postJSON(client, base+"/lattice.operator.v1.OperatorService/GetTask", map[string]any{"taskId": taskID}, &out)
+	err := postJSON(client, base+"/lattice.operator.v1.OperatorService/GetTask", map[string]any{"taskId": taskID}, token, &out)
 	return out.Task, err
 }
 
-func postJSON(client *http.Client, url string, body any, out any) error {
+func postJSON(client *http.Client, url string, body any, token string, out any) error {
 	raw, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -182,6 +204,9 @@ func postJSON(client *http.Client, url string, body any, out any) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connect-Protocol-Version", "1")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		return err

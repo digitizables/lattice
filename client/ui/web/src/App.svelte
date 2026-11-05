@@ -1,19 +1,32 @@
 <script lang="ts">
   import {
     accountName,
+    AuthRequiredError,
+    clearOperatorToken,
+    deleteLoot,
     deleteSession,
+    downloadBytes,
     formatPromptPath,
+    generateAgent,
+    getLoot,
     listAgentUpdates,
     listElevateModules,
     listListeners,
+    listLoot,
     listSessions,
+    loadOperatorToken,
     loadPathDisplay,
+    login,
+    logout,
     reloadExtensions,
     savePathDisplay,
+    setAgentSleep,
+    setSessionNote,
     userAtHost,
     type AgentUpdate,
     type ElevateModule,
     type Listener,
+    type LootItem,
     type PathDisplay,
     type Session,
   } from "./lib/api";
@@ -47,6 +60,34 @@
   let agentUpdates = $state<AgentUpdate[]>([]);
   let elevateModules = $state<ElevateModule[]>([]);
   let catalogsLoading = $state(false);
+
+  let authRequired = $state(false);
+  let loginUser = $state("admin");
+  let loginPass = $state("");
+  let loginBusy = $state(false);
+  let loginError = $state("");
+  let operatorName = $state("");
+
+  let noteDrafts = $state<Record<string, string>>({});
+  let sleepEditId = $state("");
+  let sleepSecondsInput = $state(5);
+  let sleepJitterInput = $state(0);
+  let sleepBusy = $state(false);
+
+  let lootItems = $state<LootItem[]>([]);
+  let lootTotal = $state(0);
+  let lootLoading = $state(false);
+  let lootBusyId = $state("");
+
+  let genServerUrl = $state("https://127.0.0.1:8443");
+  let genOs = $state("windows");
+  let genArch = $state("amd64");
+  let genSleep = $state(5);
+  let genJitter = $state(0);
+  let genInsecure = $state(true);
+  let genEmbedToken = $state(false);
+  let genBusy = $state(false);
+  let genStatus = $state("");
 
   const selected = $derived(
     selectedSession && selectedSession.agentId === selectedAgent
@@ -84,6 +125,111 @@
     savePathDisplay(mode);
   }
 
+  function handleAuthError(e: unknown): boolean {
+    if (e instanceof AuthRequiredError) {
+      clearOperatorToken();
+      authRequired = true;
+      loginError = "";
+      return true;
+    }
+    return false;
+  }
+
+  async function submitLogin() {
+    loginBusy = true;
+    loginError = "";
+    error = "";
+    try {
+      const res = await login(loginUser.trim(), loginPass);
+      operatorName = res.username;
+      loginPass = "";
+      authRequired = false;
+      await loadPage(0);
+    } catch (e) {
+      loginError = e instanceof Error ? e.message : String(e);
+    } finally {
+      loginBusy = false;
+    }
+  }
+
+  async function onLogout() {
+    error = "";
+    try {
+      await logout();
+    } catch {
+      clearOperatorToken();
+    }
+    operatorName = "";
+    authRequired = true;
+    sessions = [];
+    totalCount = 0;
+    activeCount = 0;
+    lootItems = [];
+  }
+
+  function sleepLabel(s: Session): string {
+    const sleep = s.sleepSeconds ?? 0;
+    const jitter = s.jitterPercent ?? 0;
+    let base = `${sleep}s`;
+    if (jitter > 0) base += ` ±${jitter}%`;
+    if (s.hasDesiredSleep) {
+      const ds = s.desiredSleepSeconds ?? 0;
+      const dj = s.desiredJitterPercent ?? 0;
+      let pending = `${ds}s`;
+      if (dj > 0) pending += ` ±${dj}%`;
+      return `${base} → ${pending}`;
+    }
+    return base;
+  }
+
+  function noteValue(s: Session): string {
+    return noteDrafts[s.agentId] ?? s.note ?? "";
+  }
+
+  async function commitNote(s: Session) {
+    const next = (noteDrafts[s.agentId] ?? s.note ?? "").trimEnd();
+    if (next === (s.note ?? "")) return;
+    error = "";
+    try {
+      const updated = await setSessionNote(s.agentId, next);
+      sessions = sessions.map((row) => (row.agentId === s.agentId ? { ...row, ...updated } : row));
+      if (selectedSession?.agentId === s.agentId) selectedSession = { ...selectedSession, ...updated };
+      const { [s.agentId]: _, ...rest } = noteDrafts;
+      noteDrafts = rest;
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  function openSleepEdit(s: Session, e: MouseEvent) {
+    e.stopPropagation();
+    sleepEditId = s.agentId;
+    sleepSecondsInput = Number(s.hasDesiredSleep ? s.desiredSleepSeconds : s.sleepSeconds) || 5;
+    sleepJitterInput = Number(s.hasDesiredSleep ? s.desiredJitterPercent : s.jitterPercent) || 0;
+  }
+
+  async function applySleep() {
+    if (!sleepEditId) return;
+    sleepBusy = true;
+    error = "";
+    try {
+      const updated = await setAgentSleep(
+        sleepEditId,
+        Math.max(0, Math.floor(sleepSecondsInput)),
+        Math.min(100, Math.max(0, Math.floor(sleepJitterInput))),
+      );
+      sessions = sessions.map((row) => (row.agentId === sleepEditId ? { ...row, ...updated } : row));
+      if (selectedSession?.agentId === sleepEditId) selectedSession = { ...selectedSession, ...updated };
+      sleepEditId = "";
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      sleepBusy = false;
+    }
+  }
+
   async function loadPage(index: number) {
     listLoading = true;
     error = "";
@@ -94,6 +240,7 @@
         pageToken: token || undefined,
         query: query || undefined,
       });
+      authRequired = false;
       sessions = res.sessions;
       totalCount = res.totalCount;
       activeCount = res.activeCount;
@@ -116,6 +263,7 @@
         }
       }
     } catch (e) {
+      if (handleAuthError(e)) return;
       error = e instanceof Error ? e.message : String(e);
     } finally {
       listLoading = false;
@@ -144,16 +292,18 @@
       }
       await loadPage(pageIndex);
     } catch (e) {
+      if (handleAuthError(e)) return;
       error = e instanceof Error ? e.message : String(e);
     }
   }
 
   $effect(() => {
+    if (authRequired) return;
     void loadPage(0);
   });
 
   $effect(() => {
-    if (nav !== "sessions") return;
+    if (nav !== "sessions" || authRequired) return;
     const idx = pageIndex;
     const id = setInterval(() => {
       void loadPage(idx);
@@ -166,6 +316,7 @@
     try {
       listeners = await listListeners();
     } catch (e) {
+      if (handleAuthError(e)) return;
       error = e instanceof Error ? e.message : String(e);
     } finally {
       listenersLoading = false;
@@ -173,7 +324,7 @@
   }
 
   $effect(() => {
-    if (nav !== "listeners") return;
+    if (nav !== "listeners" || authRequired) return;
     void loadListeners();
     const id = setInterval(() => {
       void loadListeners();
@@ -191,6 +342,7 @@
         error = "reload finished with no channels started";
       }
     } catch (e) {
+      if (handleAuthError(e)) return;
       error = e instanceof Error ? e.message : String(e);
     } finally {
       reloadBusy = false;
@@ -204,18 +356,141 @@
       agentUpdates = updates;
       elevateModules = modules;
     } catch (e) {
+      if (handleAuthError(e)) return;
       error = e instanceof Error ? e.message : String(e);
     } finally {
       catalogsLoading = false;
     }
   }
 
+  async function loadLoot() {
+    lootLoading = true;
+    try {
+      const res = await listLoot({ pageSize: 100 });
+      lootItems = res.items;
+      lootTotal = res.totalCount;
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      lootLoading = false;
+    }
+  }
+
+  async function downloadLootItem(item: LootItem) {
+    lootBusyId = item.lootId;
+    error = "";
+    try {
+      const res = await getLoot(item.lootId, true);
+      const name = item.name || item.remotePath.split(/[/\\]/).pop() || `loot-${item.lootId.slice(0, 8)}`;
+      downloadBytes(res.data, name, item.contentType || "application/octet-stream");
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      lootBusyId = "";
+    }
+  }
+
+  async function removeLootItem(item: LootItem) {
+    lootBusyId = item.lootId;
+    error = "";
+    try {
+      await deleteLoot(item.lootId);
+      await loadLoot();
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      lootBusyId = "";
+    }
+  }
+
+  async function onGenerateAgent() {
+    genBusy = true;
+    genStatus = "";
+    error = "";
+    try {
+      const res = await generateAgent({
+        serverUrl: genServerUrl.trim(),
+        os: genOs,
+        arch: genArch,
+        sleepSeconds: Math.max(0, Math.floor(genSleep)),
+        jitterPercent: Math.min(100, Math.max(0, Math.floor(genJitter))),
+        insecureTls: genInsecure,
+        embedAgentToken: genEmbedToken,
+      });
+      const ext = genOs === "windows" ? ".exe" : "";
+      const filename =
+        res.path.split(/[/\\]/).pop() || `agent-${res.os}-${res.arch}${ext}`;
+      downloadBytes(res.data, filename);
+      genStatus = `Downloaded ${filename} (${res.size.toLocaleString()} bytes, ${res.sha256.slice(0, 12)}…)`;
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      genBusy = false;
+    }
+  }
+
   $effect(() => {
-    if (nav !== "settings") return;
+    if (nav !== "settings" || authRequired) return;
     void loadCatalogs();
+    void loadLoot();
   });
 </script>
 
+{#if authRequired}
+  <div class="app-window login-gate">
+    <header class="titlebar">
+      <div class="title-block">
+        <div class="brand">Lattice</div>
+        <div class="descriptor">Operator login</div>
+      </div>
+    </header>
+    <div class="login-body">
+      <form
+        class="login-form"
+        onsubmit={(e) => {
+          e.preventDefault();
+          void submitLogin();
+        }}
+      >
+        <header class="settings-section-head">
+          <h3>Sign in</h3>
+          <p>
+            Default lab credentials are <span class="mono">admin</span> /
+            <span class="mono">lattice-change-me</span>. Auth is on unless
+            <span class="mono">LATTICE_AUTH_DISABLED=true</span>.
+          </p>
+        </header>
+        <label class="settings-field">
+          <span class="settings-field-label">
+            <span class="settings-field-title">Username</span>
+          </span>
+          <input class="search login-input" bind:value={loginUser} autocomplete="username" />
+        </label>
+        <label class="settings-field">
+          <span class="settings-field-label">
+            <span class="settings-field-title">Password</span>
+          </span>
+          <input
+            class="search login-input"
+            type="password"
+            bind:value={loginPass}
+            autocomplete="current-password"
+          />
+        </label>
+        {#if loginError}
+          <p class="login-error">{loginError}</p>
+        {/if}
+        <button class="ghost-btn login-submit" type="submit" disabled={loginBusy}>
+          {loginBusy ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
+    </div>
+  </div>
+{:else}
 <div class="app-window">
   <header class="titlebar">
     <div class="title-block">
@@ -336,6 +611,9 @@
                       <th>User@Host</th>
                       <th>Status</th>
                       <th>Platform</th>
+                      <th>Sleep</th>
+                      <th>Note</th>
+                      <th>Features</th>
                       <th>Last seen</th>
                       <th></th>
                     </tr>
@@ -351,6 +629,45 @@
                         <td>{userAtHost(s.username, s.hostname)}</td>
                         <td class={isOnline(s) ? "status-on" : "status-off"}>{isOnline(s) ? "online" : "offline"}</td>
                         <td>{s.os}/{s.arch}</td>
+                        <td class="mono" title={sleepLabel(s)}>{sleepLabel(s)}</td>
+                        <td onclick={(e) => e.stopPropagation()}>
+                          <input
+                            class="note-input"
+                            placeholder="Add note…"
+                            value={noteValue(s)}
+                            oninput={(e) => {
+                              noteDrafts = {
+                                ...noteDrafts,
+                                [s.agentId]: (e.currentTarget as HTMLInputElement).value,
+                              };
+                            }}
+                            onblur={() => void commitNote(s)}
+                            onkeydown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                (e.currentTarget as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                        </td>
+                        <td>
+                          {#if (s.features?.length ?? 0) > 0 && (s.features?.length ?? 0) <= 4}
+                            <div class="chip-row">
+                              {#each s.features ?? [] as f}
+                                <span class="chip">{f}</span>
+                              {/each}
+                            </div>
+                          {:else if (s.features?.length ?? 0) > 4}
+                            <div class="chip-row">
+                              {#each (s.features ?? []).slice(0, 3) as f}
+                                <span class="chip">{f}</span>
+                              {/each}
+                              <span class="chip muted-chip">+{(s.features?.length ?? 0) - 3}</span>
+                            </div>
+                          {:else}
+                            <span class="muted">—</span>
+                          {/if}
+                        </td>
                         <td class="mono">{s.lastSeen ?? "—"}</td>
                         <td class="row-actions">
                           <button
@@ -360,6 +677,7 @@
                               openConsole(s.agentId, s);
                             }}>Console</button
                           >
+                          <button class="ghost-btn" onclick={(e) => openSleepEdit(s, e)}>Sleep</button>
                           <button
                             class="ghost-btn"
                             onclick={(e) => {
@@ -369,6 +687,38 @@
                           >
                         </td>
                       </tr>
+                      {#if sleepEditId === s.agentId}
+                        <tr class="sleep-edit-row" onclick={(e) => e.stopPropagation()}>
+                          <td colspan="9">
+                            <div class="sleep-edit">
+                              <label>
+                                <span>Sleep (s)</span>
+                                <input
+                                  class="search login-input"
+                                  type="number"
+                                  min="0"
+                                  bind:value={sleepSecondsInput}
+                                />
+                              </label>
+                              <label>
+                                <span>Jitter %</span>
+                                <input
+                                  class="search login-input"
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  bind:value={sleepJitterInput}
+                                />
+                              </label>
+                              <button class="ghost-btn" disabled={sleepBusy} onclick={() => void applySleep()}
+                                >{sleepBusy ? "Saving…" : "Apply"}</button
+                              >
+                              <button class="ghost-btn" onclick={() => (sleepEditId = "")}>Cancel</button>
+                              <span class="muted">Applied on next check-in.</span>
+                            </div>
+                          </td>
+                        </tr>
+                      {/if}
                     {/each}
                   </tbody>
                 </table>
@@ -454,6 +804,29 @@
               </div>
             </div>
             <div class="pane-body settings-page">
+              <section class="settings-section">
+                <header class="settings-section-head">
+                  <h3>Account</h3>
+                  <p>
+                    Operator session for the Connect API.
+                    {#if operatorName}
+                      Signed in as <span class="mono">{operatorName}</span>.
+                    {:else if loadOperatorToken()}
+                      Bearer token stored in this browser.
+                    {/if}
+                    Default lab user is <span class="mono">admin</span> /
+                    <span class="mono">lattice-change-me</span>.
+                  </p>
+                </header>
+                <div class="settings-field">
+                  <div class="settings-field-label">
+                    <span class="settings-field-title">Session</span>
+                    <span class="settings-field-desc">Revoke the token on the teamserver and clear local storage.</span>
+                  </div>
+                  <button class="ghost-btn" type="button" onclick={() => void onLogout()}>Log out</button>
+                </div>
+              </section>
+
               <section class="settings-section">
                 <header class="settings-section-head">
                   <h3>Terminal</h3>
@@ -591,6 +964,110 @@
                   </table>
                 {/if}
               </section>
+
+              <section class="settings-section">
+                <header class="settings-section-head">
+                  <h3>Generate agent</h3>
+                  <p>Cross-compile a reference agent binary via <span class="mono">GenerateAgent</span> and download it.</p>
+                </header>
+                <div class="gen-grid">
+                  <label class="settings-field gen-field">
+                    <span class="settings-field-title">Server URL</span>
+                    <input class="search login-input" bind:value={genServerUrl} placeholder="https://host:8443" />
+                  </label>
+                  <label class="settings-field gen-field">
+                    <span class="settings-field-title">OS</span>
+                    <select class="search login-input" bind:value={genOs}>
+                      <option value="windows">windows</option>
+                      <option value="linux">linux</option>
+                      <option value="darwin">darwin</option>
+                    </select>
+                  </label>
+                  <label class="settings-field gen-field">
+                    <span class="settings-field-title">Arch</span>
+                    <select class="search login-input" bind:value={genArch}>
+                      <option value="amd64">amd64</option>
+                      <option value="arm64">arm64</option>
+                    </select>
+                  </label>
+                  <label class="settings-field gen-field">
+                    <span class="settings-field-title">Sleep (s)</span>
+                    <input class="search login-input" type="number" min="0" bind:value={genSleep} />
+                  </label>
+                  <label class="settings-field gen-field">
+                    <span class="settings-field-title">Jitter %</span>
+                    <input class="search login-input" type="number" min="0" max="100" bind:value={genJitter} />
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" bind:checked={genInsecure} />
+                    <span>Insecure TLS (lab self-signed)</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" bind:checked={genEmbedToken} />
+                    <span>Embed agent token</span>
+                  </label>
+                </div>
+                <div class="settings-field">
+                  <button class="ghost-btn" type="button" disabled={genBusy} onclick={() => void onGenerateAgent()}
+                    >{genBusy ? "Building…" : "Generate & download"}</button
+                  >
+                  {#if genStatus}
+                    <span class="muted">{genStatus}</span>
+                  {/if}
+                </div>
+              </section>
+
+              <section class="settings-section">
+                <header class="settings-section-head">
+                  <h3>Loot</h3>
+                  <p>
+                    Files collected from agents ({lootTotal.toLocaleString()}).
+                    {#if lootLoading}<span class="muted"> Loading…</span>{/if}
+                  </p>
+                </header>
+                {#if lootItems.length === 0}
+                  <p class="muted">No loot yet.</p>
+                {:else}
+                  <table class="sessions catalog-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Agent</th>
+                        <th>Size</th>
+                        <th>Created</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each lootItems as item (item.lootId)}
+                        <tr>
+                          <td>
+                            <div class="mono">{item.name || "—"}</div>
+                            {#if item.remotePath}
+                              <div class="muted mono">{item.remotePath}</div>
+                            {/if}
+                          </td>
+                          <td class="mono" title={item.agentId}>{item.agentId.slice(0, 8)}…</td>
+                          <td class="mono">{item.size.toLocaleString()}</td>
+                          <td class="mono">{item.createdAt ?? "—"}</td>
+                          <td class="row-actions">
+                            <button
+                              class="ghost-btn"
+                              disabled={lootBusyId === item.lootId}
+                              onclick={() => void downloadLootItem(item)}>Download</button
+                            >
+                            <button
+                              class="ghost-btn"
+                              disabled={lootBusyId === item.lootId}
+                              onclick={() => void removeLootItem(item)}>Delete</button
+                            >
+                          </td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                {/if}
+              </section>
             </div>
           </div>
         {/if}
@@ -615,3 +1092,4 @@
     <p class="error-banner">{error}</p>
   {/if}
 </div>
+{/if}

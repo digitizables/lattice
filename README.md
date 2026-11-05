@@ -18,12 +18,13 @@ It is a Go monorepo with a teamserver, reference agent, operator CLI, Svelte web
 
 The teamserver is the control plane. Operators never talk to agents directly.
 
-- **Operator API** on `:8080` (Connect).
-- **Agent ingress** through the loaded HTTP channel (default HTTPS `:8443`).
-- **PostgreSQL 16** for agents and tasks (an `operators` table exists in schema and is unused for auth).
+- **Operator API** on `:8080` (Connect) with Login/Logout bearer auth (bootstrap `admin` / `lattice-change-me` when the operators table is empty).
+- **Agent ingress** through loaded channels: HTTP(S) (default `:8443`) and TCP+TLS length-prefixed Protobuf (default `:8444`).
+- **Agent token** required on check-in when configured (`LATTICE_AGENT_TOKEN` or `data/secrets/agent_token`).
+- **PostgreSQL 16** for agents, tasks, operators, and loot metadata.
 - **Listen manager** tracks live channel listeners for `ListListeners`.
 - **Extension loader** discovers channel manifests and starts builtin channel factories; `ReloadExtensions` hot-reloads without restarting the process.
-- **Catalogs** under `data/updates` and `data/modules` for published agent binaries and BYO elevate modules.
+- **Catalogs** under `data/updates` and `data/modules`; loot under `data/loot`; generated agents under `data/generated`.
 - **Events** are an in-process pub/sub bus for session and task updates (`StreamEvents`).
 
 ### Client
@@ -49,9 +50,9 @@ Elevate modules and agent update artifacts use filesystem catalogs (`data/module
 
 ## Status
 
-Lab-ready vertical slice: Compose teamserver/web, HTTPS agent channel, operator CLI and Svelte console, persistence/update/elevate pipelines, channel extension install/reload, and e2e smoke. Interfaces may still change before a tagged stable release.
+Lab-ready vertical slice: Compose teamserver/web, HTTPS + TCP/TLS agent channels, operator auth, agent token, capability advertisement, sleep/jitter, structured ops and loot, generate/bake, operator CLI and Svelte console, persistence/update/elevate pipelines, channel extension install/reload, and e2e smoke. Interfaces may still change before a tagged stable release.
 
-Developer docs: [docs/developers/](docs/developers/). Operator runbooks: [docs/operators/](docs/operators/).
+Developer docs: [docs/developers/](docs/developers/) (includes [roadmap](docs/developers/roadmap.md)). Operator runbooks: [docs/operators/](docs/operators/).
 
 ## License
 

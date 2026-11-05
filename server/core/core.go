@@ -19,14 +19,18 @@ type Core struct {
 	bus              *Bus
 	updates          *updates.Store
 	modules          *modules.Store
+	loot             *LootStore
 	allowLocalAgents bool
 	serverHostname   string
+	agentToken       string
 }
 
 // Options configures optional Core behavior.
 type Options struct {
 	AllowLocalAgents bool
 	ServerHostname   string
+	AgentToken       string
+	Loot             *LootStore
 }
 
 // New wraps a store and optional update/module catalogs.
@@ -36,10 +40,18 @@ func New(s *store.Store, u *updates.Store, m *modules.Store, opts Options) *Core
 		bus:              newBus(),
 		updates:          u,
 		modules:          m,
+		loot:             opts.Loot,
 		allowLocalAgents: opts.AllowLocalAgents,
 		serverHostname:   opts.ServerHostname,
+		agentToken:       opts.AgentToken,
 	}
 }
+
+// AgentToken returns the shared agent secret (empty = open lab).
+func (c *Core) AgentToken() string { return c.agentToken }
+
+// Store exposes the persistence layer for auth bootstrap helpers.
+func (c *Core) Store() *store.Store { return c.store }
 
 // RejectLocalAgent reports whether an implant on the command-center host should be refused.
 // Matching is by reported hostname (not RemoteAddr): Docker Desktop often makes
@@ -75,19 +87,26 @@ func (c *Core) SubscribeEvents(buffer int) (<-chan Event, func()) {
 
 // HandleCheckIn upserts the agent and returns any queued tasks.
 func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*agentv1.AgentCheckInResponse, error) {
+	if !agentTokenOK(c.agentToken, in.GetAgentToken()) {
+		return nil, fmt.Errorf("invalid agent token")
+	}
+
 	agentID := in.GetAgentId()
 	if agentID == "" {
 		agentID = uuid.NewString()
 	}
 
 	created, err := c.store.UpsertAgent(ctx, store.Agent{
-		ID:           agentID,
-		Hostname:     in.GetHostname(),
-		Username:     in.GetUsername(),
-		OS:           in.GetOs(),
-		Arch:         in.GetArch(),
-		SleepSeconds: in.GetSleepSeconds(),
-		Cwd:          in.GetCwd(),
+		ID:            agentID,
+		Hostname:      in.GetHostname(),
+		Username:      in.GetUsername(),
+		OS:            in.GetOs(),
+		Arch:          in.GetArch(),
+		SleepSeconds:  in.GetSleepSeconds(),
+		JitterPercent: in.GetJitterPercent(),
+		Cwd:           in.GetCwd(),
+		Features:      in.GetFeatures(),
+		Ops:           in.GetOps(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("upsert agent: %w", err)
@@ -101,12 +120,13 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 		}
 	}
 
+	agent, err := c.store.GetAgent(ctx, agentID)
+	if err != nil {
+		return nil, fmt.Errorf("load agent: %w", err)
+	}
+
 	// Only broadcast brand-new sessions. Routine beacons must not fan out to every operator.
 	if created {
-		agent, err := c.store.GetAgent(ctx, agentID)
-		if err != nil {
-			return nil, fmt.Errorf("load agent: %w", err)
-		}
 		c.bus.publish(Event{Session: &agent})
 	}
 
@@ -130,10 +150,25 @@ func (c *Core) HandleCheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*ag
 			Args:   t.Args,
 		})
 	}
+	if agent.HasDesiredSleep {
+		out.SleepSeconds = agent.DesiredSleepSeconds
+		jp := agent.DesiredJitterPercent
+		out.JitterPercent = &jp
+		_ = c.store.TouchAgentSleep(ctx, agentID, agent.DesiredSleepSeconds, agent.DesiredJitterPercent)
+		_ = c.store.ClearAgentDesiredSleep(ctx, agentID)
+	}
 	if info, ok := c.UpdateHint(in.GetOs(), in.GetArch(), in.GetVersion()); ok {
 		out.Update = info
 	}
 	return out, nil
+}
+
+func agentTokenOK(configured, presented string) bool {
+	configured = strings.TrimSpace(configured)
+	if configured == "" {
+		return true
+	}
+	return strings.TrimSpace(presented) == configured
 }
 
 // UpdateHint returns update metadata when a newer build is published.

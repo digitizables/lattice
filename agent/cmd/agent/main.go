@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/digitizables/lattice/agent/bake"
 	"github.com/digitizables/lattice/agent/identity"
 	"github.com/digitizables/lattice/agent/install"
 	"github.com/digitizables/lattice/agent/runtime"
@@ -19,11 +20,43 @@ import (
 )
 
 func main() {
-	server := flag.String("server", "https://127.0.0.1:8443", "agent channel base URL")
-	sleep := flag.Duration("sleep", 5*time.Second, "time between check-ins")
-	insecure := flag.Bool("insecure", true, "skip TLS verify (needed for lab self-signed certs)")
+	defaultServer := "https://127.0.0.1:8443"
+	if bake.ServerURL != "" {
+		defaultServer = bake.ServerURL
+	}
+	defaultSleep := 5 * time.Second
+	if bake.SleepSeconds != "" {
+		if sec, err := time.ParseDuration(bake.SleepSeconds + "s"); err == nil && sec > 0 {
+			defaultSleep = sec
+		}
+	}
+	defaultToken := strings.TrimSpace(os.Getenv("LATTICE_AGENT_TOKEN"))
+	if bake.AgentToken != "" {
+		defaultToken = bake.AgentToken
+	}
+	var defaultJitter uint
+	if bake.JitterPercent != "" {
+		fmt.Sscanf(bake.JitterPercent, "%d", &defaultJitter)
+	}
+	defaultInsecure := true
+	if bake.InsecureTLS == "true" {
+		defaultInsecure = true
+	} else if bake.InsecureTLS == "false" {
+		defaultInsecure = false
+	}
+
+	server := flag.String("server", defaultServer, "agent channel base URL")
+	sleep := flag.Duration("sleep", defaultSleep, "time between check-ins")
+	insecure := flag.Bool("insecure", defaultInsecure, "skip TLS verify (needed for lab self-signed certs)")
 	idFile := flag.String("id-file", identity.DefaultIDFile(), "path used to persist the agent id across restarts")
+	token := flag.String("token", defaultToken, "shared agent token (default env LATTICE_AGENT_TOKEN or bake)")
+	jitter := flag.Uint("jitter", defaultJitter, "check-in sleep jitter percent 0-100")
 	flag.Parse()
+
+	jitterPct := *jitter
+	if jitterPct > 100 {
+		jitterPct = 100
+	}
 
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	args := flag.Args()
@@ -86,10 +119,13 @@ func main() {
 		}
 
 		a := &runtime.Agent{
-			ID:    id,
-			Sleep: *sleep,
+			ID:            id,
+			Sleep:         *sleep,
+			Token:         strings.TrimSpace(*token),
+			JitterPercent: uint32(jitterPct),
 			Transport: transport.NewHTTP(*server, transport.Options{
 				InsecureSkipVerify: *insecure,
+				Token:              strings.TrimSpace(*token),
 			}),
 			Log:         log,
 			IDFile:      *idFile,

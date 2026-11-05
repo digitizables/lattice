@@ -20,6 +20,16 @@ For the full developer map (architecture, packages, protocol, agent, UI, extensi
 - **Web UI**: Done (Vite + Svelte under `client/ui/web`; also served via Compose `web` on `:3000`)
 - **Compose teamserver/web images**: Done (`packager/docker/docker-compose.yml`)
 - **E2E smoke**: Done (`LATTICE_E2E=1 go test -tags e2e ./test/e2e`)
+- **Operator auth**: Done (Login/Logout, bearer gate, bootstrap admin, rate limit; `LATTICE_AUTH_DISABLED` lab escape)
+- **Agent token**: Done (`LATTICE_AGENT_TOKEN` or `data/secrets/agent_token`)
+- **Capabilities**: Done (check-in `features`/`ops` on Session)
+- **Sleep/jitter**: Done (`SetAgentSleep`; agent applies from check-in response)
+- **Structured ops + loot**: Done (`ps`/`ls`/`cat`/`download`/`upload`; loot store)
+- **Session notes**: Done (`SetSessionNote`)
+- **Generate/bake**: Done (`generate-agent` CLI + `GenerateAgent` RPC; `agent/bake` ldflags)
+- **TCP+TLS channel**: Done (`extensions/channels/tcp-tls`, default `:8444`)
+- **Custom agent docs**: Done (`docs/developers/custom-agents.md`)
+- **Roadmap tracker**: Done (`docs/developers/roadmap.md`)
 
 ### Lab run (Compose)
 
@@ -59,6 +69,10 @@ Env defaults:
 - `LATTICE_EXTENSIONS_DIR` = `extensions`
 - `LATTICE_CERT_DIR` = `data/certs`
 - `LATTICE_AGENT_CLEARTEXT` = `false` (set `true` only to force plain HTTP)
+- `LATTICE_AGENT_TOKEN` = empty loads/creates `data/secrets/agent_token` (Compose lab uses `lattice-lab-agent-token`)
+- `LATTICE_AUTH_DISABLED` = `false` (set `true` only for open lab API)
+- `LATTICE_BOOTSTRAP_OPERATOR` / `LATTICE_BOOTSTRAP_PASSWORD` = `admin` / `lattice-change-me` when operators table is empty
+- `LATTICE_OPERATOR_TOKEN` = CLI/UI bearer after `Login`
 
 Regenerate stubs after proto edits:
 

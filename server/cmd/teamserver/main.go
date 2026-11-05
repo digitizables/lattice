@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 
 	"github.com/digitizables/lattice/server/api"
+	"github.com/digitizables/lattice/server/auth"
 	"github.com/digitizables/lattice/server/config"
 	"github.com/digitizables/lattice/server/core"
 	latticecrypto "github.com/digitizables/lattice/server/crypto"
@@ -20,6 +22,7 @@ import (
 	"github.com/digitizables/lattice/server/httpx"
 	"github.com/digitizables/lattice/server/listen"
 	"github.com/digitizables/lattice/server/modules"
+	"github.com/digitizables/lattice/server/secrets"
 	"github.com/digitizables/lattice/server/store"
 	"github.com/digitizables/lattice/server/updates"
 )
@@ -44,6 +47,35 @@ func main() {
 	}
 	defer st.Close()
 
+	agentToken, generated, err := secrets.EnsureAgentToken(cfg.SecretsDir, cfg.AgentToken)
+	if err != nil {
+		log.Error("agent token", "err", err)
+		os.Exit(1)
+	}
+	if generated {
+		log.Warn("generated agent token", "path", filepath.Join(cfg.SecretsDir, "agent_token"), "hint", "set LATTICE_AGENT_TOKEN or bake agents with GenerateAgent")
+	} else if cfg.AgentToken != "" {
+		log.Info("agent token from environment")
+	} else {
+		log.Info("agent token loaded", "path", filepath.Join(cfg.SecretsDir, "agent_token"))
+	}
+
+	opAuth := auth.New(st, cfg.SessionTTLHours, cfg.AuthDisabled)
+	if cfg.AuthDisabled {
+		log.Warn("operator auth disabled", "env", "LATTICE_AUTH_DISABLED")
+	} else {
+		created, err := opAuth.BootstrapAdmin(ctx, cfg.BootstrapUser, cfg.BootstrapPassword)
+		if err != nil {
+			log.Error("bootstrap operator", "err", err)
+			os.Exit(1)
+		}
+		if created {
+			log.Warn("bootstrapped operator account",
+				"username", cfg.BootstrapUser,
+				"hint", "change LATTICE_BOOTSTRAP_PASSWORD; default is lattice-change-me")
+		}
+	}
+
 	up, err := updates.New(cfg.UpdatesDir)
 	if err != nil {
 		log.Error("updates", "err", err)
@@ -58,9 +90,19 @@ func main() {
 	}
 	log.Info("module catalog", "dir", cfg.ModulesDir)
 
+	lootStore, err := core.NewLootStore(cfg.LootDir, st)
+	if err != nil {
+		log.Error("loot", "err", err)
+		os.Exit(1)
+	}
+	log.Info("loot store", "dir", cfg.LootDir)
+
+	moduleRoot, _ := os.Getwd()
 	c := core.New(st, up, mods, core.Options{
 		AllowLocalAgents: cfg.AllowLocalAgents,
 		ServerHostname:   cfg.Hostname,
+		AgentToken:       agentToken,
+		Loot:             lootStore,
 	})
 	if !cfg.AllowLocalAgents {
 		log.Info("local agents denied", "hostname", cfg.Hostname, "hint", "set LATTICE_ALLOW_LOCAL_AGENTS=true to override")
@@ -109,7 +151,12 @@ func main() {
 	}
 
 	connectServer := connect.NewServer()
-	api.New(c, mgr, extRuntime, log).Register(connectServer)
+	api.New(c, mgr, extRuntime, log, api.Options{
+		Auth:         opAuth,
+		AgentToken:   agentToken,
+		GeneratedDir: cfg.GeneratedDir,
+		ModuleRoot:   moduleRoot,
+	}).Register(connectServer)
 
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, connectServer)
@@ -122,15 +169,17 @@ func main() {
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
 
+	handler := httpx.WithCORS(httpx.WithOperatorAuth(mux, opAuth))
+
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpx.WithCORS(mux),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		Protocols:         protocols,
 	}
 
 	go func() {
-		log.Info("operator API listening", "addr", cfg.HTTPAddr)
+		log.Info("operator API listening", "addr", cfg.HTTPAddr, "auth_disabled", cfg.AuthDisabled)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("operator API stopped", "err", err)
 			stop()

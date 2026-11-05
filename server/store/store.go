@@ -25,14 +25,43 @@ type Store struct {
 
 // Agent is a checked-in implant row (maps closely to operator Session).
 type Agent struct {
+	ID                    string
+	Hostname              string
+	Username              string
+	OS                    string
+	Arch                  string
+	SleepSeconds          uint64
+	JitterPercent         uint32
+	Cwd                   string
+	Note                  string
+	Features              []string
+	Ops                   []string
+	DesiredSleepSeconds   uint64
+	DesiredJitterPercent  uint32
+	HasDesiredSleep       bool
+	LastSeen              time.Time
+	CreatedAt             time.Time
+}
+
+// Operator is a console login account.
+type Operator struct {
 	ID           string
-	Hostname     string
 	Username     string
-	OS           string
-	Arch         string
-	SleepSeconds uint64
-	Cwd          string
-	LastSeen     time.Time
+	PasswordHash string
+	CreatedAt    time.Time
+}
+
+// Loot is a file deposited by an agent or staged for download.
+type Loot struct {
+	ID           string
+	AgentID      string
+	TaskID       string
+	Name         string
+	RemotePath   string
+	ContentType  string
+	SizeBytes    uint64
+	SHA256       string
+	StoragePath  string
 	CreatedAt    time.Time
 }
 
@@ -99,19 +128,24 @@ func (s *Store) UpsertAgent(ctx context.Context, a Agent) (created bool, err err
 	default:
 		return false, getErr
 	}
+	feats := EnsureStringSlice(a.Features)
+	ops := EnsureStringSlice(a.Ops)
 	const q = `
-INSERT INTO agents (id, hostname, username, os, arch, sleep_seconds, cwd, last_seen)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+INSERT INTO agents (id, hostname, username, os, arch, sleep_seconds, jitter_percent, cwd, features, ops, last_seen)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
 ON CONFLICT (id) DO UPDATE SET
   hostname = EXCLUDED.hostname,
   username = EXCLUDED.username,
   os = EXCLUDED.os,
   arch = EXCLUDED.arch,
   sleep_seconds = EXCLUDED.sleep_seconds,
+  jitter_percent = EXCLUDED.jitter_percent,
   cwd = EXCLUDED.cwd,
+  features = EXCLUDED.features,
+  ops = EXCLUDED.ops,
   last_seen = NOW()`
 	_, err = s.pool.Exec(ctx, q,
-		a.ID, a.Hostname, a.Username, a.OS, a.Arch, int64(a.SleepSeconds), a.Cwd,
+		a.ID, a.Hostname, a.Username, a.OS, a.Arch, int64(a.SleepSeconds), int32(a.JitterPercent), a.Cwd, feats, ops,
 	)
 	return created, err
 }
@@ -248,7 +282,7 @@ func (s *Store) ListAgentsPage(ctx context.Context, pageSize int32, pageToken, q
 	limitPlaceholder := fmt.Sprintf("$%d", listArgn)
 	listArgs = append(listArgs, pageSize)
 	listQ := `
-SELECT id, hostname, username, os, arch, sleep_seconds, cwd, last_seen, created_at
+SELECT ` + agentSelectCols + `
 FROM agents
 WHERE ` + strings.Join(listWhere, " AND ") + `
 ORDER BY last_seen DESC, id DESC
@@ -262,15 +296,10 @@ LIMIT ` + limitPlaceholder
 
 	var out []Agent
 	for rows.Next() {
-		var a Agent
-		var sleep int64
-		if err := rows.Scan(
-			&a.ID, &a.Hostname, &a.Username, &a.OS, &a.Arch,
-			&sleep, &a.Cwd, &a.LastSeen, &a.CreatedAt,
-		); err != nil {
+		a, err := scanAgent(rows)
+		if err != nil {
 			return AgentPage{}, err
 		}
-		a.SleepSeconds = uint64(sleep)
 		out = append(out, a)
 	}
 	if err := rows.Err(); err != nil {
@@ -315,20 +344,8 @@ func decodeAgentCursor(token string) (time.Time, string, error) {
 
 // GetAgent returns one agent by id.
 func (s *Store) GetAgent(ctx context.Context, id string) (Agent, error) {
-	const q = `
-SELECT id, hostname, username, os, arch, sleep_seconds, cwd, last_seen, created_at
-FROM agents WHERE id = $1`
-	var a Agent
-	var sleep int64
-	err := s.pool.QueryRow(ctx, q, id).Scan(
-		&a.ID, &a.Hostname, &a.Username, &a.OS, &a.Arch,
-		&sleep, &a.Cwd, &a.LastSeen, &a.CreatedAt,
-	)
-	if err != nil {
-		return Agent{}, err
-	}
-	a.SleepSeconds = uint64(sleep)
-	return a, nil
+	q := `SELECT ` + agentSelectCols + ` FROM agents WHERE id = $1`
+	return scanAgent(s.pool.QueryRow(ctx, q, id))
 }
 
 // GetTask returns one task by id.

