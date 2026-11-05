@@ -4,6 +4,8 @@ Lattice is a personal research project exploring the design of a modern command-
 
 It is a Go monorepo with a teamserver, reference agent, operator CLI, Svelte web console, versioned Protobuf contracts, an HTTP(S) channel extension, filesystem catalogs for agent updates and elevate modules, and Docker Compose lab packaging.
 
+![Lattice web UI console](docs/images/web-ui.png)
+
 ## Architecture
 
 ### Protocol
